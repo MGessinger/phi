@@ -21,7 +21,7 @@ void* newBinaryExpr (int binop, void *LHS, void *RHS)
 	return be;
 }
 
-int getTokPrecedence (token *curtok)
+int getTokPrecedence ()
 {
 	switch (curtok->tok_type)
 	{
@@ -38,21 +38,21 @@ int getTokPrecedence (token *curtok)
 	return -1;
 }
 
-void* parseNumberExpr (token *curtok)
+void* parseNumberExpr ()
 {
 	NumExpr *ne = malloc(sizeof(NumExpr));
 	if (ne == NULL)
 		return logError("Could not allocate Memory.", 0x100);
 	ne->val = curtok->numVal;
-	gettok(curtok);
+	gettok();
 	return ne;
 }
 
-void* parseParenExpr (token *curtok)
+void* parseParenExpr ()
 {
 	/* Consume the opening parenthesis */
-	gettok(curtok);
-	void *e = parseExpression(curtok);
+	gettok();
+	void *e = parseExpression();
 	if (e == NULL)
 		return NULL; /* The error was already logged elsewhere! */
 
@@ -61,55 +61,55 @@ void* parseParenExpr (token *curtok)
 		free(e);
 		return logError("expected ')'.", 0x1001);
 	}
-	gettok(curtok);
+	gettok();
 	return e;
 }
 
-void* parseIdentExpr (token *curtok)
+void* parseIdentExpr ()
 {
 	char *identName = curtok->identStr;
-	gettok(curtok); // Consume identifier
+	gettok(); // Consume identifier
 	return NULL;
 }
 
-void* parsePrimary (token *curtok)
+void* parsePrimary ()
 {
 	switch (curtok->tok_type)
 	{
 		case tok_number:
-			return parseNumberExpr(curtok);
+			return parseNumberExpr();
 		case tok_ident:
-			return parseIdentExpr(curtok);
+			return parseIdentExpr();
 		case '(':
-			return parseParenExpr(curtok);
+			return parseParenExpr();
 		default:
 			return logError("No method to parse unrecognized token.", 0x1000);
 	}
 	return NULL;
 }
 
-void* parseBinOpRHS (token *curtok, int minPrec, void* LHS)
+void* parseBinOpRHS (int minPrec, void* LHS)
 {
 	int binop, nextPrec;
 	void *RHS;
 	while (LHS != NULL)
 	{
-		int tokprec = getTokPrecedence(curtok);
+		int tokprec = getTokPrecedence();
 		if (tokprec < minPrec)
 			return LHS;
 
 		/* Consume the binary operator and parse the first piece of RHS */
 		binop = curtok->tok_type;
-		gettok(curtok);
-		RHS = parsePrimary(curtok);
+		gettok();
+		RHS = parsePrimary();
 		if (RHS == NULL)
 			return NULL;
 
 		/* Use look-ahead to test the next part of RHS */
-		nextPrec = getTokPrecedence(curtok);
+		nextPrec = getTokPrecedence();
 		if (tokprec < nextPrec)
 		{
-			RHS = parseBinOpRHS(curtok, tokprec+1, RHS);
+			RHS = parseBinOpRHS(tokprec+1, RHS);
 			if (RHS == NULL)
 				return NULL;
 		}
@@ -118,11 +118,11 @@ void* parseBinOpRHS (token *curtok, int minPrec, void* LHS)
 	return LHS;
 }
 
-void* parseExpression (token *curtok)
+void* parseExpression ()
 {
-	void *LHS = parsePrimary(curtok);
+	void *LHS = parsePrimary();
 	if (LHS == NULL)
 		return NULL;
 
-	return parseBinOpRHS(curtok, 0, LHS);
+	return parseBinOpRHS(0, LHS);
 }

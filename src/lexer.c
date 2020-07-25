@@ -30,7 +30,7 @@ void clearToken (token *tk)
 	free(tk);
 }
 
-int gettok(token* tk)
+int gettok()
 {
 	static char lastChar;
 	do {
@@ -40,19 +40,19 @@ int gettok(token* tk)
 	{
 		int ind = 0;
 		do {
-			tk->identStr[ind] = lastChar;
+			curtok->identStr[ind] = lastChar;
 			ind++;
-			if (ind >= tk->strLen)
+			if (ind >= curtok->strLen)
 			{
-				tk->strLen += 32;
-				if (realloc(tk->identStr, tk->strLen))
+				curtok->strLen += 32;
+				if (realloc(curtok->identStr, curtok->strLen))
 					exit(-1);
 			}
 			lastChar = getchar();
 		} while (isalnum(lastChar));
-		if (strncmp("def", tk->identStr, 3) == 0)
+		if (strncmp("def", curtok->identStr, 3) == 0)
 			return tok_def;
-		else if (strncmp("extern", tk->identStr, 6) == 0)
+		else if (strncmp("extern", curtok->identStr, 6) == 0)
 			return tok_extern;
 		else
 			return tok_ident;
@@ -67,7 +67,7 @@ int gettok(token* tk)
 			ind ++;
 			lastChar = getchar();
 		} while (isdigit(lastChar) || lastChar == '.');
-		tk->numVal = strtod(numberStr, NULL);
+		curtok->numVal = strtod(numberStr, NULL);
 		return tok_number;
 	}
 	else if (lastChar == '#')
@@ -76,7 +76,7 @@ int gettok(token* tk)
 			lastChar = getchar();
 		} while (lastChar != EOF && lastChar != '\n' && lastChar != '\r');
 		if (lastChar != EOF)
-			return gettok(tk);
+			return gettok();
 	}
 	else if (lastChar == EOF)
 	{

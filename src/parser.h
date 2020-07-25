@@ -19,11 +19,13 @@ typedef struct CallExprAST {
 	void **args;
 } CallExpr;
 
-void* parseNumberExpr (token *curtok);
-void* parseParenExpr (token *curtok);
-void* parseBinOpRHS (token *curtok, int minPrec, void* LHS);
+void* parseNumberExpr ();
+void* parseParenExpr ();
+void* parseBinOpRHS (int minPrec, void* LHS);
 
-void* parseExpression (token *curtok);
-void* parsePrimary (token *curtok);
+void* parseExpression ();
+void* parsePrimary ();
+
+extern token *curtok;
 
 #endif /* PARSER_H_ */

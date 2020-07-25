@@ -21,6 +21,8 @@ enum Token
 
 token *makeToken (int len);
 void clearToken (token *tk);
-int gettok (token *tk);
+int gettok ();
+
+extern token *curtok;
 
 #endif /* LEXER_H_ */
