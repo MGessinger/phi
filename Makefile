@@ -2,7 +2,7 @@ NAME = fc
 
 WARNINGS = -Wall -Wextra -pedantic
 CFLAGS = -O2 -g $(WARNINGS)
-SRCS = main.c lexer.c parser.c tokens.c
+SRCS = main.c lexer.c parser.c
 OBJS = $(subst .c,.o,$(SRCS))
 
 all: $(NAME)

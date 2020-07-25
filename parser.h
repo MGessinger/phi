@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "tokens.h"
 #include "lexer.h"
 
 typedef struct NumExprAST {

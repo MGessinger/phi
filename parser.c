@@ -11,7 +11,7 @@ void* parseNumberExpr (token *curtok)
 {
 	NumExpr *ne = malloc(sizeof(NumExpr));
 	if (ne == NULL)
-		return NULL;
+		return logError("Could not allocate Memory.", 0x100);
 	ne->val = curtok->numVal;
 	gettok(curtok);
 	return ne;
