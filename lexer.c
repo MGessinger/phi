@@ -20,13 +20,12 @@ int gettok(token* tk)
 			}
 			lastChar = getchar();
 		} while (isalnum(lastChar));
-		int tok;
 		if (strncmp("def", tk->identStr, 3) == 0)
-			tok = tok_def;
+			return tok_def;
 		else if (strncmp("extern", tk->identStr, 6) == 0)
-			tok = tok_extern;
+			return tok_extern;
 		else
-			tok = tok_ident;
+			return tok_ident;
 	}
 	else if (isdigit(lastChar) || lastChar == '.')
 	{
