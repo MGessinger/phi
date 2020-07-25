@@ -70,7 +70,7 @@ Expr* parseIdentExpr ()
 	return NULL;
 }
 
-Expr* parseProtoType ()
+Expr* parsePrototype ()
 {
 	int inArgs = 0;
 	int outArgs = 0;
@@ -103,6 +103,22 @@ Expr* parseProtoType ()
 		return logError("Function must have at least one return type!", 0x1004);
 
 	return newProtoExpr (nameCopy, inArgs, outArgs);
+}
+
+Expr* parseDefinition ()
+{
+	gettok(); /* Consume "new" */
+	Expr *proto = parsePrototype();
+	if (proto == NULL)
+		return NULL;
+
+	Expr *e = parseExpression();
+	if (e == NULL)
+	{
+		clearExpr(proto);
+		return NULL;
+	}
+	return newFunctionExpr(proto, e);
 }
 
 Expr* parsePrimary ()

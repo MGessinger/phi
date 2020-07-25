@@ -52,6 +52,26 @@ Expr* newProtoExpr (char *name, int in, int out)
 	pe->name = name;
 	pe->inArgs = in;
 	pe->outArgs = out;
+	e->expr = pe;
+	e->expr_type = expr_proto;
+	return e;
+}
+
+Expr* newFunctionExpr (Expr *proto, Expr *body)
+{
+	Expr *e = malloc(sizeof(Expr));
+	if (e == NULL)
+		return logError("Could not allocate Memory", 0x100);
+	FunctionExpr *fe = malloc(sizeof(FunctionExpr));
+	if (fe == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x100 + expr_func);
+	}
+	fe->proto = proto;
+	fe->body = body;
+	e->expr = fe;
+	e->expr_type = expr_func;
 	return e;
 }
 
@@ -63,6 +83,21 @@ void clearBinOpExpr (BinaryExpr *be)
 	clearExpr(be->RHS);
 }
 
+void clearProtoExpr (ProtoExpr *pe)
+{
+	if (pe == NULL)
+		return;
+	free(pe->name);
+}
+
+void clearFunctionExpr (FunctionExpr *fe)
+{
+	if (fe == NULL)
+		return;
+	clearExpr(fe->proto);
+	clearExpr(fe->body);
+}
+
 void clearExpr (Expr *e)
 {
 	if (e == NULL)
@@ -71,6 +106,12 @@ void clearExpr (Expr *e)
 	{
 		case expr_binop:
 			clearBinOpExpr(e->expr);
+			break;
+		case expr_proto:
+			clearProtoExpr(e->expr);
+			break;
+		case expr_func:
+			clearFunctionExpr(e->expr);
 			break;
 		default:
 			break;

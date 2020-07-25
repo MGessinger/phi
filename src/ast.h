@@ -5,7 +5,8 @@ enum Expressions
 {
 	expr_number,
 	expr_binop,
-	expr_proto
+	expr_proto,
+	expr_func
 };
 
 /* General Expression type */
@@ -30,9 +31,15 @@ typedef struct ProtoExprAST {
 	char *name;
 } ProtoExpr;
 
+typedef struct FuncExprAST {
+	Expr *proto;
+	Expr *body;
+} FunctionExpr;
+
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newNumberExpr (double val);
 Expr* newProtoExpr (char *name, int in, int out);
+Expr* newFunctionExpr (Expr *proto, Expr *body);
 
 void clearExpr (Expr *e);
 
