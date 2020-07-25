@@ -10,7 +10,7 @@ typedef struct VarExprAST {
 } VarExpr;
 
 typedef struct BinaryExprAST {
-	char op;
+	int op;
 	void *LHS, *RHS;
 } BinaryExpr;
 
@@ -21,8 +21,9 @@ typedef struct CallExprAST {
 
 void* parseNumberExpr (token *curtok);
 void* parseParenExpr (token *curtok);
-void* parseExpression (token *curtok);
+void* parseBinOpRHS (token *curtok, int minPrec, void* LHS);
 
+void* parseExpression (token *curtok);
 void* parsePrimary (token *curtok);
 
 #endif /* PARSER_H_ */
