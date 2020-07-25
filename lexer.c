@@ -1,6 +1,6 @@
 #include "lexer.h"
 
-static int gettok(char *identStr, int strLen, int *numVal)
+int gettok(token* tk)
 {
 	static char lastChar;
 	do {
@@ -10,22 +10,23 @@ static int gettok(char *identStr, int strLen, int *numVal)
 	{
 		int ind = 0;
 		do {
-			identStr[ind] = lastChar;
+			tk->identStr[ind] = lastChar;
 			ind++;
-			if (ind >= strLen)
+			if (ind >= tk->strLen)
 			{
-				strLen += 32;
-				if (realloc(identStr, strLen))
+				tk->strLen += 32;
+				if (realloc(tk->identStr, tk->strLen))
 					exit(-1);
 			}
 			lastChar = getchar();
 		} while (isalnum(lastChar));
-		if (strncmp("def", identStr, 3) == 0)
-			return tok_def;
-		else if (strncmp("extern", identStr, 6) == 0)
-			return tok_extern;
+		int tok;
+		if (strncmp("def", tk->identStr, 3) == 0)
+			tok = tok_def;
+		else if (strncmp("extern", tk->identStr, 6) == 0)
+			tok = tok_extern;
 		else
-			return tok_ident;
+			tok = tok_ident;
 	}
 	else if (isdigit(lastChar) || lastChar == '.')
 	{
@@ -37,7 +38,7 @@ static int gettok(char *identStr, int strLen, int *numVal)
 			ind ++;
 			lastChar = getchar();
 		} while (isdigit(lastChar) || lastChar == '.');
-		*numVal = strtod(numberStr, NULL);
+		tk->numVal = strtod(numberStr, NULL);
 		return tok_number;
 	}
 	else if (lastChar == '#')
@@ -46,7 +47,7 @@ static int gettok(char *identStr, int strLen, int *numVal)
 			lastChar = getchar();
 		} while (lastChar != EOF && lastChar != '\n' && lastChar != '\r');
 		if (lastChar != EOF)
-			return gettok(identStr, strLen, numVal);
+			return gettok(tk);
 	}
 	else if (lastChar == EOF)
 	{
