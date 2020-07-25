@@ -5,7 +5,7 @@
 
 #include "lexer.h"
 
-token *makeToken (int len)
+token* makeToken (int len)
 {
 	token *tk = malloc(sizeof(token));
 	if (tk == NULL)
@@ -36,6 +36,7 @@ int gettok()
 	int tok_type = 0;
 	while (isspace(lastChar))
 		lastChar = getchar();
+	/* Identifiers or Language Keywords */
 	if (isalpha(lastChar))
 	{
 		int ind = 0;
@@ -50,13 +51,16 @@ int gettok()
 			}
 			lastChar = getchar();
 		} while (isalnum(lastChar));
-		if (strncmp("def", curtok->identStr, 3) == 0)
+		if (strncmp("new", curtok->identStr, 3) == 0)
 			tok_type = tok_def;
 		else if (strncmp("extern", curtok->identStr, 6) == 0)
 			tok_type = tok_extern;
+		else if (strncmp("Number", curtok->identStr, 6) == 0)
+			tok_type = tok_type;
 		else
 			tok_type = tok_ident;
 	}
+	/* Numerical literals */
 	else if (isdigit(lastChar) || lastChar == '.')
 	{
 		tok_type = tok_number;
@@ -70,6 +74,7 @@ int gettok()
 		} while (isdigit(lastChar) || lastChar == '.');
 		curtok->numVal = strtod(numberStr, NULL);
 	}
+	/* single-line Comments */
 	else if (lastChar == '#')
 	{
 		do {
@@ -81,6 +86,17 @@ int gettok()
 	else if (lastChar == EOF)
 	{
 		tok_type = tok_eof;
+	}
+	else if (lastChar == '-')
+	{
+		lastChar = getchar();
+		if (lastChar == '>')
+		{
+			tok_type = tok_arrow;
+			lastChar = getchar();
+		}
+		else
+			tok_type = '-';
 	}
 	else
 	{

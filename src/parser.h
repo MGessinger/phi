@@ -9,6 +9,7 @@ void* logError (const char *errMsg, int errCode);
 Expr* parseNumberExpr ();
 Expr* parseParenExpr ();
 Expr* parseBinOpRHS (int minPrec, Expr* LHS);
+Expr* parsePrototype ();
 
 Expr* parseExpression ();
 Expr* parsePrimary ();

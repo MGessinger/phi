@@ -2,7 +2,7 @@
 #include "parser.h"
 #include <stdlib.h>
 
-Expr *newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
+Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 {
 	Expr *e = malloc(sizeof(Expr));
 	if (e == NULL)
@@ -35,6 +35,23 @@ Expr* newNumberExpr (double val)
 	ne->val = val;
 	e->expr_type = expr_number;
 	e->expr = ne;
+	return e;
+}
+
+Expr* newProtoExpr (char *name, int in, int out)
+{
+	Expr *e = malloc(sizeof(Expr));
+	if (e == NULL)
+		return logError("Could not allocate Memory", 0x100);
+	ProtoExpr *pe = malloc(sizeof(ProtoExpr));
+	if (pe == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x100 + expr_proto);
+	}
+	pe->name = name;
+	pe->inArgs = in;
+	pe->outArgs = out;
 	return e;
 }
 

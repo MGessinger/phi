@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ast.h"
 #include "lexer.h"
@@ -9,6 +10,17 @@ void* logError(const char *errstr, int errcode)
 {
 	fprintf(stderr, "Error %x: %s\n", errcode, errstr);
 	return NULL;
+}
+
+char* copyString (const char *str)
+{
+	if (str == NULL)
+		return NULL;
+	char *copy = malloc((strlen(str)+1)*sizeof(char));
+	if (copy == NULL)
+		return NULL;
+	strcpy(copy, str);
+	return copy;
 }
 
 int getTokPrecedence ()
@@ -54,9 +66,43 @@ Expr* parseParenExpr ()
 
 Expr* parseIdentExpr ()
 {
-	//char *identName = curtok->identStr;
 	gettok(); // Consume identifier
 	return NULL;
+}
+
+Expr* parseProtoType ()
+{
+	int inArgs = 0;
+	int outArgs = 0;
+	/* Expected syntax: inType1 ... inTypeN -> funcName -> outType1 ... outTypeN */
+	while (curtok->tok_type == tok_typename)
+	{
+		inArgs++;
+		gettok();
+	}
+	if (inArgs != 0)
+	{
+		if (curtok->tok_type != tok_arrow)
+			return logError("Expected \"->\" in function prototype with input types!", 0x1001);
+		else
+			gettok(); /* Consume "->" */
+	}
+
+	if (curtok->tok_type != tok_ident)
+		return logError("Expected Function Name in prototype!", 0x1002);
+	char *nameCopy = copyString(curtok->identStr);
+	gettok(); /* Consume function Name */
+
+	if (curtok->tok_type != tok_arrow)
+		return logError("Function must have at least one return type. Are you missing an \"->\"?", 0x1003);
+	gettok(); /* Consume "->" */
+
+	while (curtok->tok_type == tok_typename)
+		outArgs++;
+	if (outArgs == 0)
+		return logError("Function must have at least one return type!", 0x1004);
+
+	return newProtoExpr (nameCopy, inArgs, outArgs);
 }
 
 Expr* parsePrimary ()
