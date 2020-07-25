@@ -20,5 +20,9 @@ typedef struct CallExprAST {
 } CallExpr;
 
 void* parseNumberExpr (token *curtok);
+void* parseParenExpr (token *curtok);
+void* parseExpression (token *curtok);
+
+void* parsePrimary (token *curtok);
 
 #endif /* PARSER_H_ */

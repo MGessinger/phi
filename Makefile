@@ -1,14 +1,13 @@
-NAME = fc
-
-WARNINGS = -Wall -Wextra -pedantic
-CFLAGS = -O2 -g $(WARNINGS)
+CFLAGS = -O2 -g -Wall -Wextra -pedantic
 SRCS = main.c lexer.c parser.c
 OBJS = $(subst .c,.o,$(SRCS))
 
-all: $(NAME)
+VPATH = src
+
+all: fc
 .PHONY: all
 
-$(NAME): $(OBJS)
+fc: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
@@ -16,5 +15,5 @@ clean:
 .PHONY: clean
 
 distclean: clean
-	rm $(NAME)
+	rm fc
 .PHONY: distclean
