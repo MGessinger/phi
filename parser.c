@@ -1,5 +1,8 @@
-#include "parser.h"
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "lexer.h"
+#include "parser.h"
 
 void* logError(const char *errstr, int errcode)
 {

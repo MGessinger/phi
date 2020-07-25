@@ -1,10 +1,6 @@
 #ifndef PARSER_H_
 #define PARSER_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "lexer.h"
-
 typedef struct NumExprAST {
 	double val;
 } NumExpr;
