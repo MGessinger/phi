@@ -32,10 +32,10 @@ void clearToken (token *tk)
 
 int gettok()
 {
-	static char lastChar;
-	do {
+	static char lastChar = ' ';
+	int tok_type = 0;
+	while (isspace(lastChar))
 		lastChar = getchar();
-	} while (isspace(lastChar));
 	if (isalpha(lastChar))
 	{
 		int ind = 0;
@@ -51,14 +51,15 @@ int gettok()
 			lastChar = getchar();
 		} while (isalnum(lastChar));
 		if (strncmp("def", curtok->identStr, 3) == 0)
-			return tok_def;
+			tok_type = tok_def;
 		else if (strncmp("extern", curtok->identStr, 6) == 0)
-			return tok_extern;
+			tok_type = tok_extern;
 		else
-			return tok_ident;
+			tok_type = tok_ident;
 	}
 	else if (isdigit(lastChar) || lastChar == '.')
 	{
+		tok_type = tok_number;
 		char numberStr[128];
 		memset(numberStr, '\0', 128);
 		int ind = 0;
@@ -68,7 +69,6 @@ int gettok()
 			lastChar = getchar();
 		} while (isdigit(lastChar) || lastChar == '.');
 		curtok->numVal = strtod(numberStr, NULL);
-		return tok_number;
 	}
 	else if (lastChar == '#')
 	{
@@ -76,17 +76,18 @@ int gettok()
 			lastChar = getchar();
 		} while (lastChar != EOF && lastChar != '\n' && lastChar != '\r');
 		if (lastChar != EOF)
-			return gettok();
+			tok_type = gettok();
 	}
 	else if (lastChar == EOF)
 	{
-		return tok_eof;
+		tok_type = tok_eof;
 	}
 	else
 	{
 		int thisChar = lastChar;
 		lastChar = getchar();
-		return thisChar;
+		tok_type = thisChar;
 	}
-	return 0;
+	curtok->tok_type = tok_type;
+	return tok_type;
 }
