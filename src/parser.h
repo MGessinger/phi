@@ -12,6 +12,8 @@ Expr* parseBinOpRHS (int minPrec, Expr* LHS);
 
 Expr* parsePrototype ();
 Expr* parseDefinition ();
+Expr* parseExtern ();
+Expr* parseTopLevelExpr ();
 
 Expr* parseExpression ();
 Expr* parsePrimary ();

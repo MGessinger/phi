@@ -87,7 +87,8 @@ void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
 		return;
-	free(pe->name);
+	if (pe->name != NULL)
+		free(pe->name);
 }
 
 void clearFunctionExpr (FunctionExpr *fe)

@@ -121,6 +121,34 @@ Expr* parseDefinition ()
 	return newFunctionExpr(proto, e);
 }
 
+Expr* parseExtern ()
+{
+	gettok(); /* Consume "extern" */
+	return parsePrototype();
+}
+
+Expr* parseTopLevelExpr ()
+{
+	Expr *e = parseExpression();
+	if (e == NULL)
+		return NULL;
+	/* Create an anonymous prototype with no input and one output */
+	Expr *anon = newProtoExpr (NULL, 0, 1);
+	if (anon == NULL)
+	{
+		clearExpr(e);
+		return NULL;
+	}
+	Expr *tle = newFunctionExpr(anon, e);
+	if (tle == NULL)
+	{
+		clearExpr(e);
+		clearExpr(anon);
+		return NULL;
+	}
+	return tle;
+}
+
 Expr* parsePrimary ()
 {
 	switch (curtok->tok_type)
