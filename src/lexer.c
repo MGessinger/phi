@@ -51,12 +51,13 @@ int gettok()
 			}
 			lastChar = getchar();
 		} while (isalnum(lastChar));
-		if (strncmp("new", curtok->identStr, 3) == 0)
+		curtok->identStr[ind] = '\0';
+		if (strncmp("new", curtok->identStr, 4) == 0)
 			tok_type = tok_def;
-		else if (strncmp("extern", curtok->identStr, 6) == 0)
+		else if (strncmp("extern", curtok->identStr, 7) == 0)
 			tok_type = tok_extern;
-		else if (strncmp("Number", curtok->identStr, 6) == 0)
-			tok_type = tok_type;
+		else if (strncmp("Number", curtok->identStr, 7) == 0)
+			tok_type = tok_typename;
 		else
 			tok_type = tok_ident;
 	}

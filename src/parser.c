@@ -98,7 +98,10 @@ Expr* parsePrototype ()
 	gettok(); /* Consume "->" */
 
 	while (curtok->tok_type == tok_typename)
+	{
 		outArgs++;
+		gettok();
+	}
 	if (outArgs == 0)
 		return logError("Function must have at least one return type!", 0x1004);
 
