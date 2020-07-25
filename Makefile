@@ -1,6 +1,6 @@
 LLVMFLAGS = $(shell llvm-config --cflags)
-CFLAGS = -O3 -g -Wall -Wextra -pedantic
-SRCS = main.c lexer.c parser.c
+CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic
+SRCS = main.c lexer.c parser.c ast.c
 OBJS = $(subst .c,.o,$(SRCS))
 
 VPATH = src

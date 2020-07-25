@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "ast.h"
 #include "lexer.h"
 #include "parser.h"
 
@@ -8,17 +9,6 @@ void* logError(const char *errstr, int errcode)
 {
 	fprintf(stderr, "Error %x: %s\n", errcode, errstr);
 	return NULL;
-}
-
-void* newBinaryExpr (int binop, void *LHS, void *RHS)
-{
-	BinaryExpr *be = malloc(sizeof(BinaryExpr));
-	if (be == NULL)
-		return logError("Could not allocate Memory.", 0x101);
-	be->op = binop;
-	be->LHS = LHS;
-	be->RHS = RHS;
-	return be;
 }
 
 int getTokPrecedence ()
@@ -38,17 +28,14 @@ int getTokPrecedence ()
 	return -1;
 }
 
-void* parseNumberExpr ()
+Expr* parseNumberExpr ()
 {
-	NumExpr *ne = malloc(sizeof(NumExpr));
-	if (ne == NULL)
-		return logError("Could not allocate Memory.", 0x100);
-	ne->val = curtok->numVal;
+	Expr *e = newNumberExpr(curtok->numVal);
 	gettok();
-	return ne;
+	return e;
 }
 
-void* parseParenExpr ()
+Expr* parseParenExpr ()
 {
 	/* Consume the opening parenthesis */
 	gettok();
@@ -65,14 +52,14 @@ void* parseParenExpr ()
 	return e;
 }
 
-void* parseIdentExpr ()
+Expr* parseIdentExpr ()
 {
-	char *identName = curtok->identStr;
+	//char *identName = curtok->identStr;
 	gettok(); // Consume identifier
 	return NULL;
 }
 
-void* parsePrimary ()
+Expr* parsePrimary ()
 {
 	switch (curtok->tok_type)
 	{
@@ -88,10 +75,10 @@ void* parsePrimary ()
 	return NULL;
 }
 
-void* parseBinOpRHS (int minPrec, void* LHS)
+Expr* parseBinOpRHS (int minPrec, Expr* LHS)
 {
 	int binop, nextPrec;
-	void *RHS;
+	Expr *RHS;
 	while (LHS != NULL)
 	{
 		int tokprec = getTokPrecedence();
@@ -118,7 +105,7 @@ void* parseBinOpRHS (int minPrec, void* LHS)
 	return LHS;
 }
 
-void* parseExpression ()
+Expr* parseExpression ()
 {
 	void *LHS = parsePrimary();
 	if (LHS == NULL)

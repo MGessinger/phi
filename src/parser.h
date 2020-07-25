@@ -1,30 +1,17 @@
 #ifndef PARSER_H_
 #define PARSER_H_
 
-typedef struct NumExprAST {
-	double val;
-} NumExpr;
+#include "ast.h"
+#include "lexer.h"
 
-typedef struct VarExprAST {
-	char *name;
-} VarExpr;
+void* logError (const char *errMsg, int errCode);
 
-typedef struct BinaryExprAST {
-	int op;
-	void *LHS, *RHS;
-} BinaryExpr;
+Expr* parseNumberExpr ();
+Expr* parseParenExpr ();
+Expr* parseBinOpRHS (int minPrec, Expr* LHS);
 
-typedef struct CallExprAST {
-	char *callee;
-	void **args;
-} CallExpr;
-
-void* parseNumberExpr ();
-void* parseParenExpr ();
-void* parseBinOpRHS (int minPrec, void* LHS);
-
-void* parseExpression ();
-void* parsePrimary ();
+Expr* parseExpression ();
+Expr* parsePrimary ();
 
 extern token *curtok;
 
