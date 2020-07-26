@@ -2,13 +2,14 @@ LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs core)
 CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic $(LLVMFLAGS)
 SRCS = main.c lexer.c parser.c ast.c codegen.o
 OBJS = $(subst .c,.o,$(SRCS))
+NAME = phi
 
 VPATH = src
 
-all: fc
+all: $(NAME)
 .PHONY: all
 
-fc: $(OBJS)
+$(NAME): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
@@ -16,5 +17,5 @@ clean:
 .PHONY: clean
 
 distclean: clean
-	rm fc
+	rm $(NAME)
 .PHONY: distclean
