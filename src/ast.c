@@ -2,6 +2,23 @@
 #include "parser.h"
 #include <stdlib.h>
 
+Expr* newNumberExpr (double val)
+{
+	Expr *e = malloc(sizeof(Expr));
+	if (e == NULL)
+		return logError("Could not allocate Memory", 0x100);
+	NumExpr *ne = malloc(sizeof(NumExpr));
+	if (ne == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x100);
+	}
+	ne->val = val;
+	e->expr_type = expr_number;
+	e->expr = ne;
+	return e;
+}
+
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 {
 	Expr *e = malloc(sizeof(Expr));
@@ -21,20 +38,20 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	return e;
 }
 
-Expr* newNumberExpr (double val)
+Expr* newIdentExpr (char *name)
 {
 	Expr *e = malloc(sizeof(Expr));
 	if (e == NULL)
 		return logError("Could not allocate Memory", 0x100);
-	NumExpr *ne = malloc(sizeof(NumExpr));
-	if (ne == NULL)
+	IdentExpr *ie = malloc(sizeof(IdentExpr));
+	if (ie == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory.", 0x100);
+		return logError("Could not allocate Memory", 0x100 + expr_ident);
 	}
-	ne->val = val;
-	e->expr_type = expr_number;
-	e->expr = ne;
+	ie->name = name;
+	e->expr_type = expr_ident;
+	e->expr = ie;
 	return e;
 }
 
@@ -83,6 +100,13 @@ void clearBinOpExpr (BinaryExpr *be)
 	clearExpr(be->RHS);
 }
 
+void clearIdentExpr (IdentExpr *ie)
+{
+	if (ie == NULL)
+		return;
+	free(ie->name);
+}
+
 void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
@@ -107,6 +131,9 @@ void clearExpr (Expr *e)
 	{
 		case expr_binop:
 			clearBinOpExpr(e->expr);
+			break;
+		case expr_ident:
+			clearIdentExpr(e->expr);
 			break;
 		case expr_proto:
 			clearProtoExpr(e->expr);

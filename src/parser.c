@@ -58,7 +58,7 @@ Expr* parseParenExpr ()
 	if (curtok->tok_type != ')')
 	{
 		free(e);
-		return logError("expected ')'.", 0x1001);
+		return logError("expected ')'.", 0x1100);
 	}
 	gettok();
 	return e;
@@ -66,44 +66,58 @@ Expr* parseParenExpr ()
 
 Expr* parseIdentExpr ()
 {
+	char *nameCopy = copyString(curtok->identStr);
 	gettok(); // Consume identifier
-	return logError("parseIdent is not implemented yet!", 0xFFFFFF);
+	return newIdentExpr(nameCopy);
 }
 
 Expr* parsePrototype ()
 {
 	int inArgs = 0;
 	int outArgs = 0;
-	/* Expected syntax: inType1 ... inTypeN -> funcName -> outType1 ... outTypeN */
+	/* Expected syntax: inType1:inName1 ... inTypeN:inNameN -> funcName -> outType1:outName1 ... outTypeN:outNameN */
 	while (curtok->tok_type == tok_typename)
 	{
+		gettok(); /* Consume the type, expecting ':' */
+		if (curtok->tok_type != ':')
+			return logError("All input parameters must be named. Are you missing a ':'?", 0x1200);
+		gettok(); /* Consume the ':', expecting identifier */
+		if (curtok->tok_type != tok_ident)
+			return logError("All input parameters must be named in the form \"Type:Name\".", 0x1201);
+		gettok(); /* Consume the identifier */
 		inArgs++;
-		gettok();
 	}
 	if (inArgs != 0)
 	{
 		if (curtok->tok_type != tok_arrow)
-			return logError("Expected \"->\" in function prototype with input types!", 0x1001);
+			return logError("Expected \"->\" in function prototype with input types!", 0x1202);
 		else
 			gettok(); /* Consume "->" */
 	}
 
 	if (curtok->tok_type != tok_ident)
-		return logError("Expected Function Name in prototype!", 0x1002);
+		return logError("Expected Function Name in prototype!", 0x1203);
 	char *nameCopy = copyString(curtok->identStr);
 	gettok(); /* Consume function Name */
 
 	if (curtok->tok_type != tok_arrow)
-		return logError("Function must have at least one return type. Are you missing an \"->\"?", 0x1003);
+		return logError("Function must have at least one return type. Are you missing an \"->\"?", 0x1204);
 	gettok(); /* Consume "->" */
 
 	while (curtok->tok_type == tok_typename)
 	{
 		outArgs++;
-		gettok();
+		gettok(); /* Consume the type name. Might be followed by ':' */
+		if (curtok->tok_type == ':')
+		{
+			gettok(); /* Consume ':', expecting identifier! */
+			if (curtok->tok_type != tok_ident)
+				return logError("Stray ':' in program. Expected identifier.", 0x1205);
+			gettok(); /* Consume the identifier */
+		}
 	}
 	if (outArgs == 0)
-		return logError("Function must have at least one return type!", 0x1004);
+		return logError("Function must have at least one return type!", 0x1206);
 
 	return newProtoExpr(nameCopy, inArgs, outArgs);
 }
@@ -165,9 +179,9 @@ Expr* parsePrimary ()
 		case ';':
 			return NULL;
 		case tok_eof:
-			return logError("File ended while scanning Expression!", 0xFF);
+			return logError("File ended while scanning Expression!", 0x1000);
 		default:
-			return logError("No method to parse unrecognized token.", 0x1000);
+			return logError("No method to parse unrecognized token.", 0x1001);
 	}
 	return NULL;
 }
@@ -195,7 +209,7 @@ Expr* parseBinOpRHS (int minPrec, Expr* LHS)
 				return NULL;
 		}
 		LHS = newBinaryExpr (binop, LHS, RHS);
-		tokPrec = nextPrec;
+		tokPrec = getTokPrecedence();
 	}
 	return LHS;
 }
