@@ -53,7 +53,7 @@ Expr* parseParenExpr ()
 	gettok();
 	void *e = parseExpression();
 	if (e == NULL)
-		return NULL; /* The error was already logged elsewhere! */
+		return NULL;
 
 	if (curtok->tok_type != ')')
 	{
@@ -67,7 +67,7 @@ Expr* parseParenExpr ()
 Expr* parseIdentExpr ()
 {
 	gettok(); // Consume identifier
-	return NULL;
+	return logError("parseIdent is not implemented yet!", 0xFFFFFF);
 }
 
 Expr* parsePrototype ()
@@ -105,7 +105,7 @@ Expr* parsePrototype ()
 	if (outArgs == 0)
 		return logError("Function must have at least one return type!", 0x1004);
 
-	return newProtoExpr (nameCopy, inArgs, outArgs);
+	return newProtoExpr(nameCopy, inArgs, outArgs);
 }
 
 Expr* parseDefinition ()
@@ -162,6 +162,10 @@ Expr* parsePrimary ()
 			return parseIdentExpr();
 		case '(':
 			return parseParenExpr();
+		case ';':
+			return NULL;
+		case tok_eof:
+			return logError("File ended while scanning Expression!", 0xFF);
 		default:
 			return logError("No method to parse unrecognized token.", 0x1000);
 	}
@@ -172,12 +176,9 @@ Expr* parseBinOpRHS (int minPrec, Expr* LHS)
 {
 	int binop, nextPrec;
 	Expr *RHS;
-	while (LHS != NULL)
+	int tokPrec = getTokPrecedence();
+	while (tokPrec >= minPrec)
 	{
-		int tokprec = getTokPrecedence();
-		if (tokprec < minPrec)
-			return LHS;
-
 		/* Consume the binary operator and parse the first piece of RHS */
 		binop = curtok->tok_type;
 		gettok();
@@ -187,13 +188,14 @@ Expr* parseBinOpRHS (int minPrec, Expr* LHS)
 
 		/* Use look-ahead to test the next part of RHS */
 		nextPrec = getTokPrecedence();
-		if (tokprec < nextPrec)
+		if (tokPrec < nextPrec)
 		{
-			RHS = parseBinOpRHS(tokprec+1, RHS);
+			RHS = parseBinOpRHS(tokPrec+1, RHS);
 			if (RHS == NULL)
 				return NULL;
 		}
 		LHS = newBinaryExpr (binop, LHS, RHS);
+		tokPrec = nextPrec;
 	}
 	return LHS;
 }

@@ -38,13 +38,10 @@ void REPL ()
 	Expr *tmp = NULL;
 	fprintf(stderr, "> ");
 	gettok();
-	while (1)
+	while (curtok->tok_type != tok_eof)
 	{
 		switch (curtok->tok_type)
 		{
-			case tok_eof:
-				tmp = NULL;
-				return;
 			case ';': /* Skip top-level semicolons */
 				tmp = NULL;
 				gettok();
@@ -59,10 +56,10 @@ void REPL ()
 				tmp = handleTopLevelExpr();
 				break;
 		}
-		printf("%p\n", (void*)tmp);
 		clearExpr(tmp);
 		fprintf(stderr, "> ");
 	}
+	fprintf(stderr, "\n");
 }
 
 int main (int argc, char **argv)
