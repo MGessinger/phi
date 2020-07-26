@@ -58,6 +58,7 @@ void REPL ()
 				tmp = handleTopLevelExpr();
 				break;
 		}
+		codegen(tmp);
 		clearExpr(tmp);
 		fprintf(stderr, "> ");
 	}

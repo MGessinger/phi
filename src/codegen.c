@@ -1,5 +1,6 @@
 #include <llvm-c/Types.h>
 #include <llvm-c/Core.h>
+#include <llvm-c/Analysis.h>
 #include <stdlib.h>
 
 #include "ast.h"
@@ -17,12 +18,13 @@ void initialiseLLVM ()
 
 	llvm_context = LLVMGetGlobalContext();
 	llvm_builder = LLVMCreateBuilderInContext(llvm_context);
-	llvm_module = LLVMModuleCreateWithNameInContext("llvm_module", llvm_context);
+	llvm_module = LLVMModuleCreateWithNameInContext("phi_conpiler_module", llvm_context);
 }
 
 void shutdownLLVM ()
 {
 	LLVMDisposeBuilder(llvm_builder);
+	LLVMDumpModule(llvm_module);
 	LLVMDisposeModule(llvm_module);
 	LLVMShutdown();
 }
@@ -62,6 +64,48 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	return val;
 }
 
+LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
+{
+	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(llvm_context);
+	int numOfInputArgs = (pe->inArgs + pe->outArgs - 1);
+	LLVMTypeRef *args = malloc(numOfInputArgs*sizeof(LLVMTypeRef));
+	if (args == NULL)
+		return NULL;
+	for (int i = 0; i < numOfInputArgs; i++)
+		args[i] = doubleType;
+
+	LLVMTypeRef funcType = LLVMFunctionType(doubleType, args, numOfInputArgs, 0);
+	LLVMValueRef Fn = LLVMAddFunction(llvm_module, pe->name, funcType);
+	/* Give names to the arguments of Fn! */
+	free(args);
+	return Fn;
+}
+
+LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
+{
+	ProtoExpr *pe = fe->proto->expr;
+	/* Test if a function has been declared before */
+	LLVMValueRef function = LLVMGetNamedFunction(llvm_module, pe->name);
+	if (function == NULL)
+		function = codegenProtoExpr(pe);
+	if (function == NULL)
+		return NULL;
+
+	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(llvm_context, function, "bodyEntry");
+	LLVMPositionBuilderAtEnd(llvm_builder, bodyBlock);
+
+	/* Store argument in scope! */
+	LLVMValueRef body = codegen(fe->body);
+	if (body == NULL)
+	{
+		LLVMDeleteGlobal(function);
+		return NULL;
+	}
+	LLVMBuildRet(llvm_builder, body);
+	LLVMVerifyFunction(function, LLVMPrintMessageAction);
+	return function;
+}
+
 LLVMValueRef codegen (Expr *e)
 {
 	if (e == NULL)
@@ -72,6 +116,10 @@ LLVMValueRef codegen (Expr *e)
 			return codegenNumExpr(e->expr);
 		case expr_binop:
 			return codegenBinaryExpr(e->expr);
+		case expr_proto:
+			return codegenProtoExpr(e->expr);
+		case expr_func:
+			return codegenFuncExpr(e->expr);
 		default:
 			logError("Cannot generate IR for unrecognized expression type!", 0x2000);
 	}

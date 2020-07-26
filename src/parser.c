@@ -150,7 +150,8 @@ Expr* parseTopLevelExpr ()
 	if (e == NULL)
 		return NULL;
 	/* Create an anonymous prototype with no input and one output */
-	Expr *anon = newProtoExpr (NULL, 0, 1);
+	char *name = copyString("");
+	Expr *anon = newProtoExpr (name, 0, 1);
 	if (anon == NULL)
 	{
 		clearExpr(e);
