@@ -1,8 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "lexer.h"
 #include "parser.h"
 #include "ast.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "codegen.h"
 
 token *curtok;
 
@@ -68,9 +70,11 @@ int main (int argc, char **argv)
 		return -1;
 	argv[0] = '\0';
 	curtok = makeToken(32);
+	initialiseLLVM();
 
 	REPL();
 
 	clearToken(curtok);
+	shutdownLLVM();
 	return 0;
 }

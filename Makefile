@@ -1,6 +1,6 @@
-LLVMFLAGS = $(shell llvm-config --cflags)
-CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic
-SRCS = main.c lexer.c parser.c ast.c
+LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs core)
+CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic $(LLVMFLAGS)
+SRCS = main.c lexer.c parser.c ast.c codegen.o
 OBJS = $(subst .c,.o,$(SRCS))
 
 VPATH = src
@@ -9,7 +9,7 @@ all: fc
 .PHONY: all
 
 fc: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LLVMFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
 	rm $(OBJS)
