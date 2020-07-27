@@ -70,7 +70,7 @@ int main (int argc, char **argv)
 	if (argc > 1)
 		return -1;
 	argv[0] = '\0';
-	curtok = makeToken(32);
+	curtok = makeToken();
 	initialiseLLVM();
 
 	REPL();

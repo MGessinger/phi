@@ -3,9 +3,8 @@
 
 typedef struct token {
 	int tok_type;
+	double numVal;
 	char *identStr;
-	int strLen;
-	int numVal;
 } token;
 
 enum Token
@@ -21,7 +20,7 @@ enum Token
 	tok_typename = -7
 };
 
-token* makeToken (int len);
+token* makeToken ();
 void clearToken (token *tk);
 int gettok ();
 
