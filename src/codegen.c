@@ -7,31 +7,31 @@
 #include "parser.h"
 #include "codegen.h"
 
-static LLVMContextRef llvm_context;
-static LLVMModuleRef llvm_module;
-static LLVMBuilderRef llvm_builder;
+static LLVMContextRef phi_context;
+static LLVMModuleRef phi_module;
+static LLVMBuilderRef phi_builder;
 
 void initialiseLLVM ()
 {
 	LLVMPassRegistryRef passreg = LLVMGetGlobalPassRegistry();
 	LLVMInitializeCore(passreg);
 
-	llvm_context = LLVMGetGlobalContext();
-	llvm_builder = LLVMCreateBuilderInContext(llvm_context);
-	llvm_module = LLVMModuleCreateWithNameInContext("phi_conpiler_module", llvm_context);
+	phi_context = LLVMGetGlobalContext();
+	phi_builder = LLVMCreateBuilderInContext(phi_context);
+	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
 }
 
 void shutdownLLVM ()
 {
-	LLVMDisposeBuilder(llvm_builder);
-	LLVMDumpModule(llvm_module);
-	LLVMDisposeModule(llvm_module);
+	LLVMDisposeBuilder(phi_builder);
+	LLVMDumpModule(phi_module);
+	LLVMDisposeModule(phi_module);
 	LLVMShutdown();
 }
 
 LLVMValueRef codegenNumExpr (NumExpr *ne)
 {
-	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(llvm_context);
+	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
 	return LLVMConstReal(doubleType, ne->val);
 }
 
@@ -46,16 +46,16 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	switch (be->op)
 	{
 		case '+':
-			val = LLVMBuildFAdd(llvm_builder, l, r, "addtmp");
+			val = LLVMBuildFAdd(phi_builder, l, r, "addtmp");
 			break;
 		case '-':
-			val = LLVMBuildFSub(llvm_builder, l, r, "subtmp");
+			val = LLVMBuildFSub(phi_builder, l, r, "subtmp");
 			break;
 		case '*':
-			val = LLVMBuildFMul(llvm_builder, l, r, "multmp");
+			val = LLVMBuildFMul(phi_builder, l, r, "multmp");
 			break;
 		case '<':
-			val = LLVMBuildFCmp(llvm_builder, LLVMRealOLT, l, r, "lttmp");
+			val = LLVMBuildFCmp(phi_builder, LLVMRealOLT, l, r, "lttmp");
 			break;
 		default:
 			val = logError("Unrecognized binary operator!", 0x2001);
@@ -66,7 +66,7 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 
 LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 {
-	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(llvm_context);
+	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
 	int numOfInputArgs = (pe->inArgs + pe->outArgs - 1);
 	LLVMTypeRef *args = malloc(numOfInputArgs*sizeof(LLVMTypeRef));
 	if (args == NULL)
@@ -75,7 +75,7 @@ LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 		args[i] = doubleType;
 
 	LLVMTypeRef funcType = LLVMFunctionType(doubleType, args, numOfInputArgs, 0);
-	LLVMValueRef Fn = LLVMAddFunction(llvm_module, pe->name, funcType);
+	LLVMValueRef Fn = LLVMAddFunction(phi_module, pe->name, funcType);
 	/* Give names to the arguments of Fn! */
 	free(args);
 	return Fn;
@@ -85,14 +85,14 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 {
 	ProtoExpr *pe = fe->proto->expr;
 	/* Test if a function has been declared before */
-	LLVMValueRef function = LLVMGetNamedFunction(llvm_module, pe->name);
+	LLVMValueRef function = LLVMGetNamedFunction(phi_module, pe->name);
 	if (function == NULL)
 		function = codegenProtoExpr(pe);
 	if (function == NULL)
 		return NULL;
 
-	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(llvm_context, function, "bodyEntry");
-	LLVMPositionBuilderAtEnd(llvm_builder, bodyBlock);
+	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(phi_context, function, "bodyEntry");
+	LLVMPositionBuilderAtEnd(phi_builder, bodyBlock);
 
 	/* Store argument in scope! */
 	LLVMValueRef body = codegen(fe->body);
@@ -101,7 +101,7 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		LLVMDeleteGlobal(function);
 		return NULL;
 	}
-	LLVMBuildRet(llvm_builder, body);
+	LLVMBuildRet(phi_builder, body);
 	LLVMVerifyFunction(function, LLVMPrintMessageAction);
 	return function;
 }
