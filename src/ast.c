@@ -2,11 +2,20 @@
 #include "parser.h"
 #include <stdlib.h>
 
-Expr* newNumberExpr (double val)
+Expr* newExpression (int expr_type)
 {
 	Expr *e = malloc(sizeof(Expr));
 	if (e == NULL)
 		return logError("Could not allocate Memory", 0x100);
+	e->expr_type = expr_type;
+	return e;
+}
+
+Expr* newNumberExpr (double val)
+{
+	Expr *e = newExpression(expr_number);
+	if (e == NULL)
+		return NULL;
 	NumExpr *ne = malloc(sizeof(NumExpr));
 	if (ne == NULL)
 	{
@@ -14,16 +23,15 @@ Expr* newNumberExpr (double val)
 		return logError("Could not allocate Memory.", 0x100);
 	}
 	ne->val = val;
-	e->expr_type = expr_number;
 	e->expr = ne;
 	return e;
 }
 
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 {
-	Expr *e = malloc(sizeof(Expr));
+	Expr *e = newExpression(expr_binop);
 	if (e == NULL)
-		return logError("Could not allocate Memory", 0x100);
+		return NULL;
 	BinaryExpr *be = malloc(sizeof(BinaryExpr));
 	if (be == NULL)
 	{
@@ -34,15 +42,14 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	be->LHS = LHS;
 	be->RHS = RHS;
 	e->expr = be;
-	e->expr_type = expr_binop;
 	return e;
 }
 
 Expr* newIdentExpr (char *name)
 {
-	Expr *e = malloc(sizeof(Expr));
+	Expr *e = newExpression(expr_ident);
 	if (e == NULL)
-		return logError("Could not allocate Memory", 0x100);
+		return NULL;
 	IdentExpr *ie = malloc(sizeof(IdentExpr));
 	if (ie == NULL)
 	{
@@ -50,16 +57,15 @@ Expr* newIdentExpr (char *name)
 		return logError("Could not allocate Memory", 0x100 + expr_ident);
 	}
 	ie->name = name;
-	e->expr_type = expr_ident;
 	e->expr = ie;
 	return e;
 }
 
 Expr* newProtoExpr (char *name, int in, int out)
 {
-	Expr *e = malloc(sizeof(Expr));
+	Expr *e = newExpression(expr_proto);
 	if (e == NULL)
-		return logError("Could not allocate Memory", 0x100);
+		return NULL;
 	ProtoExpr *pe = malloc(sizeof(ProtoExpr));
 	if (pe == NULL)
 	{
@@ -70,15 +76,14 @@ Expr* newProtoExpr (char *name, int in, int out)
 	pe->inArgs = in;
 	pe->outArgs = out;
 	e->expr = pe;
-	e->expr_type = expr_proto;
 	return e;
 }
 
 Expr* newFunctionExpr (Expr *proto, Expr *body)
 {
-	Expr *e = malloc(sizeof(Expr));
+	Expr *e = newExpression(expr_func);
 	if (e == NULL)
-		return logError("Could not allocate Memory", 0x100);
+		return NULL;
 	FunctionExpr *fe = malloc(sizeof(FunctionExpr));
 	if (fe == NULL)
 	{
@@ -88,7 +93,6 @@ Expr* newFunctionExpr (Expr *proto, Expr *body)
 	fe->proto = proto;
 	fe->body = body;
 	e->expr = fe;
-	e->expr_type = expr_func;
 	return e;
 }
 
