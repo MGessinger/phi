@@ -10,7 +10,7 @@ Expr* parseNumberExpr ();
 Expr* parseParenExpr ();
 Expr* parseBinOpRHS (int minPrec, Expr* LHS);
 
-Expr* parsePrototype ();
+Expr* parsePrototype (int isExtern);
 Expr* parseDefinition ();
 Expr* parseExtern ();
 Expr* parseTopLevelExpr ();

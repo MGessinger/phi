@@ -71,7 +71,7 @@ Expr* parseIdentExpr ()
 	return newIdentExpr(nameCopy);
 }
 
-Expr* parsePrototype ()
+Expr* parsePrototype (int isExtern)
 {
 	int inArgs = 0;
 	int outArgs = 0;
@@ -79,12 +79,17 @@ Expr* parsePrototype ()
 	while (curtok->tok_type == tok_typename)
 	{
 		gettok(); /* Consume the type, expecting ':' */
-		if (curtok->tok_type != ':')
+		if (curtok->tok_type == ':')
+		{
+			gettok(); /* Consume the ':', expecting identifier */
+			if (curtok->tok_type != tok_ident)
+				return logError("All input parameters must be named in the form \"Type:Name\".", 0x1201);
+			gettok(); /* Consume the identifier */
+		}
+		else if (!isExtern)
+		{
 			return logError("All input parameters must be named. Are you missing a ':'?", 0x1200);
-		gettok(); /* Consume the ':', expecting identifier */
-		if (curtok->tok_type != tok_ident)
-			return logError("All input parameters must be named in the form \"Type:Name\".", 0x1201);
-		gettok(); /* Consume the identifier */
+		}
 		inArgs++;
 	}
 	if (inArgs != 0)
@@ -125,7 +130,7 @@ Expr* parsePrototype ()
 Expr* parseDefinition ()
 {
 	gettok(); /* Consume "new" */
-	Expr *proto = parsePrototype();
+	Expr *proto = parsePrototype(0);
 	if (proto == NULL)
 		return NULL;
 
@@ -141,7 +146,7 @@ Expr* parseDefinition ()
 Expr* parseExtern ()
 {
 	gettok(); /* Consume "extern" */
-	return parsePrototype();
+	return parsePrototype(1);
 }
 
 Expr* parseTopLevelExpr ()
