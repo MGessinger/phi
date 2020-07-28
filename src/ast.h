@@ -1,6 +1,8 @@
 #ifndef AST_H_
 #define AST_H_
 
+#include "stack.h"
+
 enum Expressions
 {
 	expr_number,
@@ -31,8 +33,8 @@ typedef struct IdentExprAST {
 } IdentExpr;
 
 typedef struct ProtoExprAST {
-	int inArgs;
-	int outArgs;
+	stack *inArgs;
+	stack *outArgs;
 	char *name;
 } ProtoExpr;
 
@@ -44,7 +46,7 @@ typedef struct FuncExprAST {
 Expr* newNumberExpr (double val);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name);
-Expr* newProtoExpr (char *name, int in, int out);
+Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 
 void clearExpr (Expr *e);

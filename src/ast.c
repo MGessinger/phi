@@ -61,7 +61,7 @@ Expr* newIdentExpr (char *name)
 	return e;
 }
 
-Expr* newProtoExpr (char *name, int in, int out)
+Expr* newProtoExpr (char *name, stack *in, stack *out)
 {
 	Expr *e = newExpression(expr_proto);
 	if (e == NULL)
@@ -115,6 +115,8 @@ void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
 		return;
+	clearStack(pe->inArgs, free);
+	clearStack(pe->outArgs, free);
 	free(pe->name);
 }
 

@@ -2,7 +2,9 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "stack.h"
 #include "ast.h"
 #include "parser.h"
 #include "codegen.h"
@@ -10,6 +12,8 @@
 static LLVMContextRef phi_context;
 static LLVMModuleRef phi_module;
 static LLVMBuilderRef phi_builder;
+
+static stack *namesInScope;
 
 void initialiseLLVM ()
 {
@@ -19,10 +23,12 @@ void initialiseLLVM ()
 	phi_context = LLVMGetGlobalContext();
 	phi_builder = LLVMCreateBuilderInContext(phi_context);
 	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
+	namesInScope = NULL;
 }
 
 void shutdownLLVM ()
 {
+	clearStack(namesInScope, NULL);
 	LLVMDisposeBuilder(phi_builder);
 	LLVMDumpModule(phi_module);
 	LLVMDisposeModule(phi_module);
@@ -33,6 +39,27 @@ LLVMValueRef codegenNumExpr (NumExpr *ne)
 {
 	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
 	return LLVMConstReal(doubleType, ne->val);
+}
+
+LLVMValueRef codegenIdentExpr (IdentExpr *ie)
+{
+	const char *valName;
+	size_t length;
+
+	LLVMValueRef v;
+	stack *runner = namesInScope;
+	while (runner != NULL)
+	{
+		v = runner->item;
+		valName = LLVMGetValueName2(v, &length);
+		if (strncmp(valName, ie->name, length))
+			return v;
+		runner = runner->next;
+	}
+	v = LLVMGetNamedFunction(phi_module, ie->name);
+	if (v == NULL)
+		return logError("Unrecognized identifier!", 0x2004);
+	return v;
 }
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
@@ -67,18 +94,29 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 {
 	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
-	int numOfInputArgs = (pe->inArgs + pe->outArgs - 1);
+	int numOfInputArgs = depth(pe->inArgs);
 	LLVMTypeRef *args = malloc(numOfInputArgs*sizeof(LLVMTypeRef));
 	if (args == NULL)
-		return NULL;
+		return logError("Could not write Function Args!", 0x2002);
+	stack *runner = pe->inArgs;
+	/* Careful: This loop reverses the order of the arguments! */
 	for (int i = 0; i < numOfInputArgs; i++)
-		args[i] = doubleType;
+	{
+		switch (runner->misc)
+		{
+			case tok_number:
+				args[i] = doubleType;
+				break;
+			default:
+				args[i] = doubleType;
+				break;
+		}
+		runner = runner->next;
+	}
 
 	LLVMTypeRef funcType = LLVMFunctionType(doubleType, args, numOfInputArgs, 0);
-	LLVMValueRef Fn = LLVMAddFunction(phi_module, pe->name, funcType);
-	/* Give names to the arguments of Fn! */
 	free(args);
-	return Fn;
+	return LLVMAddFunction(phi_module, pe->name, funcType);
 }
 
 LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
@@ -87,22 +125,47 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	/* Test if a function has been declared before */
 	LLVMValueRef function = LLVMGetNamedFunction(phi_module, pe->name);
 	if (function == NULL)
+	{
 		function = codegenProtoExpr(pe);
-	if (function == NULL)
-		return NULL;
+		if (function == NULL)
+			return NULL;
+	}
+	else if (LLVMCountBasicBlocks(function) != 0)
+		return logError("Cannot redefine function. This definition will be ignored.", 0x2003);
 
+	/* Give names to the function arguments. That way we can refer back to them in the function body. */
+	unsigned paramCount = LLVMCountParams(function);
+	LLVMValueRef *args = malloc(paramCount * sizeof(LLVMValueRef));
+	if (args == NULL)
+		return logError("Could not read arguments.", 0x2004);
+	LLVMGetParams(function, args);
+	for (int i = paramCount-1; i >= 0; i--)
+	{
+		char *name = pop(&(pe->inArgs));
+		LLVMValueRef v = args[i];
+		LLVMSetValueName2(v, name, strlen(name));
+		namesInScope = push(v, 1, namesInScope);
+		free(name);
+	}
+	free(args);
+
+	/* Build function body recursively */
 	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(phi_context, function, "bodyEntry");
 	LLVMPositionBuilderAtEnd(phi_builder, bodyBlock);
 
-	/* Store argument in scope! */
 	LLVMValueRef body = codegen(fe->body);
 	if (body == NULL)
 	{
-		LLVMDeleteGlobal(function);
+		LLVMDeleteFunction(function);
 		return NULL;
 	}
 	LLVMBuildRet(phi_builder, body);
 	LLVMVerifyFunction(function, LLVMPrintMessageAction);
+
+	/* Remove local variables from the scope.
+	 * Note: These are precisely the first paramCount items on the stack */
+	for (unsigned i = 0; i < paramCount; i++)
+		pop(&namesInScope);
 	return function;
 }
 
@@ -116,6 +179,8 @@ LLVMValueRef codegen (Expr *e)
 			return codegenNumExpr(e->expr);
 		case expr_binop:
 			return codegenBinaryExpr(e->expr);
+		case expr_ident:
+			return codegenIdentExpr(e->expr);
 		case expr_proto:
 			return codegenProtoExpr(e->expr);
 		case expr_func:

@@ -71,60 +71,77 @@ Expr* parseIdentExpr ()
 	return newIdentExpr(nameCopy);
 }
 
-Expr* parsePrototype (int isExtern)
+stack* readTypeSignature (int needsName)
 {
-	int inArgs = 0;
-	int outArgs = 0;
-	/* Expected syntax: inType1:inName1 ... inTypeN:inNameN -> funcName -> outType1:outName1 ... outTypeN:outNameN */
-	while (curtok->tok_type == tok_typename)
+	stack *args = NULL;
+	char *nameCopy = NULL;
+	int argType = curtok->tok_type;
+	while (argType == tok_typename)
 	{
 		gettok(); /* Consume the type, expecting ':' */
 		if (curtok->tok_type == ':')
 		{
 			gettok(); /* Consume the ':', expecting identifier */
 			if (curtok->tok_type != tok_ident)
-				return logError("All input parameters must be named in the form \"Type:Name\".", 0x1201);
+			{
+				clearStack(args, free);
+				return logError("All input parameters must be named in the form \"Type:Name\".", 0x1200);
+			}
+			if (needsName)
+				nameCopy = copyString(curtok->identStr);
 			gettok(); /* Consume the identifier */
 		}
-		else if (!isExtern)
+		else if (needsName)
 		{
-			return logError("All input parameters must be named. Are you missing a ':'?", 0x1200);
+			clearStack(args, free);
+			return logError("All input parameters must be named. Are you missing a ':'?", 0x1201);
 		}
-		inArgs++;
+		args = push(nameCopy, argType, args);
+		argType = curtok->tok_type;
 	}
-	if (inArgs != 0)
+	return args;
+}
+
+Expr* parsePrototype (int isExtern)
+{
+	/* Expected syntax: inType1:inName1 ... inTypeN:inNameN -> funcName -> outType1:outName1 ... outTypeN:outNameN */
+	stack *inArgs = readTypeSignature(!isExtern);
+	if (inArgs != NULL)
 	{
 		if (curtok->tok_type != tok_arrow)
+		{
+			clearStack(inArgs, free);
 			return logError("Expected \"->\" in function prototype with input types!", 0x1202);
+		}
 		else
 			gettok(); /* Consume "->" */
 	}
 
 	if (curtok->tok_type != tok_ident)
+	{
+		clearStack(inArgs, free);
 		return logError("Expected Function Name in prototype!", 0x1203);
-	char *nameCopy = copyString(curtok->identStr);
+	}
+	char *functionName = copyString(curtok->identStr);
 	gettok(); /* Consume function Name */
 
 	if (curtok->tok_type != tok_arrow)
+	{
+		clearStack(inArgs, free);
+		free(functionName);
 		return logError("Function must have at least one return type. Are you missing an \"->\"?", 0x1204);
+	}
 	gettok(); /* Consume "->" */
 
-	while (curtok->tok_type == tok_typename)
+	stack *outArgs = readTypeSignature(0);
+	if (outArgs == NULL)
 	{
-		outArgs++;
-		gettok(); /* Consume the type name. Might be followed by ':' */
-		if (curtok->tok_type == ':')
-		{
-			gettok(); /* Consume ':', expecting identifier! */
-			if (curtok->tok_type != tok_ident)
-				return logError("Stray ':' in program. Expected identifier.", 0x1205);
-			gettok(); /* Consume the identifier */
-		}
-	}
-	if (outArgs == 0)
+		clearStack(inArgs, free);
+		free(functionName);
 		return logError("Function must have at least one return type!", 0x1206);
+	}
 
-	return newProtoExpr(nameCopy, inArgs, outArgs);
+	return newProtoExpr(functionName, inArgs, outArgs);
 }
 
 Expr* parseDefinition ()
@@ -156,7 +173,7 @@ Expr* parseTopLevelExpr ()
 		return NULL;
 	/* Create an anonymous prototype with no input and one output */
 	char *name = copyString("");
-	Expr *anon = newProtoExpr (name, 0, 1);
+	Expr *anon = newProtoExpr (name, NULL, NULL);
 	if (anon == NULL)
 	{
 		clearExpr(e);
