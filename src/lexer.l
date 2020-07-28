@@ -1,4 +1,6 @@
 %{
+#define YY_NO_INPUT
+#define YY_NO_UNPUT
 #include "lexer.h"
 %}
 %x COMMENT
