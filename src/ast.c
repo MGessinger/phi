@@ -95,6 +95,27 @@ Expr* newFunctionExpr (Expr *proto, Expr *body)
 	return e;
 }
 
+Expr* newCommandExpr (Expr *e1, Expr *e2)
+{
+	Expr *e = newExpression(expr_comm);
+	if (e == NULL)
+		return NULL;
+	CommandExpr *ce = malloc(sizeof(CommandExpr));
+	if (ce == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x106);
+	}
+	ce->es[0] = e1;
+	ce->es[1] = e2;
+	e->expr = ce;
+	return e;
+}
+
+/*----------------------*\
+ *	Clear Data	*
+\*----------------------*/
+
 void clearBinOpExpr (BinaryExpr *be)
 {
 	if (be == NULL)
@@ -127,6 +148,14 @@ void clearFunctionExpr (FunctionExpr *fe)
 	clearExpr(fe->body);
 }
 
+void clearCommandExpr (CommandExpr *ce)
+{
+	if (ce == NULL)
+		return;
+	clearExpr(ce->es[0]);
+	clearExpr(ce->es[1]);
+}
+
 void clearExpr (Expr *e)
 {
 	if (e == NULL)
@@ -144,6 +173,9 @@ void clearExpr (Expr *e)
 			break;
 		case expr_func:
 			clearFunctionExpr(e->expr);
+			break;
+		case expr_comm:
+			clearCommandExpr(e->expr);
 			break;
 		default:
 			break;

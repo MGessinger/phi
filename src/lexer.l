@@ -15,6 +15,7 @@ char *copyString (const char *str);
 
 new			return keyword_new;
 extern			return keyword_extern;
+just			return keyword_just;
 
 Bool			return type_bool;
 Number			return type_number;

@@ -9,7 +9,8 @@ enum Expressions
 	expr_binop,
 	expr_ident,
 	expr_proto,
-	expr_func
+	expr_func,
+	expr_comm
 };
 
 /* General Expression type */
@@ -32,6 +33,10 @@ typedef struct IdentExprAST {
 	char *name;
 } IdentExpr;
 
+typedef struct CommandExprAST {
+	Expr *es[2];
+} CommandExpr;
+
 typedef struct ProtoExprAST {
 	stack *inArgs;
 	stack *outArgs;
@@ -48,6 +53,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
+Expr* newCommandExpr (Expr *e1, Expr *e2);
 
 void* logError(const char *msg, int code);
 void clearExpr (Expr *e);

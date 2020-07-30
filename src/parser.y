@@ -14,7 +14,7 @@
 }
 %token <numerical> tok_number tok_arr
 %token <string> tok_ident
-%token keyword_new keyword_extern
+%token keyword_new keyword_extern keyword_just
 %token <numerical> type_number type_string type_bool
 
 %type <numerical>		TYPEARG
@@ -46,11 +46,11 @@ TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
 		DECLARATION		{ printf("Parsed external declaration\n");	$$ = $3; }
 	 | keyword_new			{ needsName = 1; }
 		DEFINITION		{ printf("Parsed function definition\n");	$$ = $3; }
-	 | COMMAND			{ printf("Parsed top-level command\n");
+	 | keyword_just COMMAND	{ printf("Parsed top-level command\n");
 					  char *name = malloc(sizeof(char));
 					  name[0] = '\0';
 					  Expr *anon = newProtoExpr (name, NULL, NULL);
-					  $$ = newFunctionExpr(anon, $1); }
+					  $$ = newFunctionExpr(anon, $2); }
 	 ;
 
 DECBODY : tok_ident			{ needsName = 0; }
@@ -106,6 +106,7 @@ EXPRESSION : BINARYOP
 	   ;
 
 COMMAND : EXPRESSION
+	| COMMAND EXPRESSION		{ $$ = newCommandExpr($1, $2); }
 	;
 
 PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
