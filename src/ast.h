@@ -49,6 +49,7 @@ Expr* newIdentExpr (char *name);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 
+void* logError(const char *msg, int code);
 void clearExpr (Expr *e);
 
 #endif /* AST_H_ */

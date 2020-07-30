@@ -1,12 +1,10 @@
 %{
 #define YY_NO_INPUT
 #define YY_NO_UNPUT
-#include "lexer.h"
+#include "parser.h"
+char *copyString (const char *str);
 %}
 %x COMMENT
-
-TYPE		Number|String|Bool
-IDENT		[a-zA-Z_]*
 %%
 "/*"			{ BEGIN(COMMENT); }
 <COMMENT>"*/"		{ BEGIN(INITIAL); }
@@ -15,40 +13,31 @@ IDENT		[a-zA-Z_]*
 "//".*			|
 [ \t\n]
 
-<<EOF>>			return tok_eof;
-new			return tok_def;
-extern			return tok_extern;
-"->"			return tok_arrow;
+new			return keyword_new;
+extern			return keyword_extern;
 
-([0-9]*".")?[0-9]+	{ curtok->numVal = strtod(yytext, NULL); return tok_number; }
-{TYPE}			{ curtok->identStr = yytext; return tok_typename; }
-{IDENT}			{ curtok->identStr = yytext; return tok_ident; }
+Bool			return type_bool;
+Number			return type_number;
+String			return type_string;
+
+([0-9]*".")?[0-9]+	{ yylval.numerical = strtod(yytext, NULL); return tok_number; }
+[a-zA-Z_]+		{ yylval.string = copyString(yytext); return tok_ident; }
+"->"			return tok_arr;
+
 .			return yytext[0];
 %%
-token* makeToken ()
+char* copyString (const char *str)
 {
-	token *tk = malloc(sizeof(token));
-	if (tk == NULL)
+	if (str == NULL)
 		return NULL;
-	tk->identStr = NULL;
-	tk->numVal = 0;
-	tk->tok_type = 0;
-	return tk;
-}
-
-void clearToken (token *tk)
-{
-	free(tk);
-	yylex_destroy();
+	char *copy = malloc((strlen(str)+1)*sizeof(char));
+	if (copy == NULL)
+		return NULL;
+	strcpy(copy, str);
+	return copy;
 }
 
 int yywrap ()
 {
 	return 1;
-}
-int gettok()
-{
-	int tok_type = yylex();
-	curtok->tok_type = tok_type;
-	return tok_type;
 }

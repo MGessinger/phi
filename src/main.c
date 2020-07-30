@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lexer.h"
 #include "parser.h"
 #include "ast.h"
 #include "codegen.h"
 
-token *curtok;
+int yylex();
+int yylex_destroy();
 
+/*
 Expr* handleDefinition ()
 {
 	Expr* e = parseDefinition();
@@ -34,48 +35,18 @@ Expr* handleTopLevelExpr ()
 		gettok();
 	return e;
 }
-
-void REPL ()
-{
-	Expr *tmp = NULL;
-	fprintf(stderr, "> ");
-	gettok();
-	while (curtok->tok_type != tok_eof)
-	{
-		switch (curtok->tok_type)
-		{
-			case ';': /* Skip top-level semicolons */
-				tmp = NULL;
-				gettok();
-				break;
-			case tok_def:
-				tmp = handleDefinition();
-				break;
-			case tok_extern:
-				tmp = handleExtern();
-				break;
-			default:
-				tmp = handleTopLevelExpr();
-				break;
-		}
-		codegen(tmp);
-		clearExpr(tmp);
-		fprintf(stderr, "> ");
-	}
-	fprintf(stderr, "\n");
-}
+*/
 
 int main (int argc, char **argv)
 {
 	if (argc > 1)
 		return -1;
 	argv[0] = '\0';
-	curtok = makeToken();
+
 	initialiseLLVM();
-
-	REPL();
-
-	clearToken(curtok);
+	yyparse();
+	yylex_destroy();
 	shutdownLLVM();
+
 	return 0;
 }
