@@ -129,6 +129,9 @@ void* logError(const char *errstr, int errcode)
 	const char *errtype;
 	switch (errcode & 0xF000)
 	{
+		case 0x0000:
+			errtype = "Internal";
+			break;
 		case 0x1000:
 			errtype = "Syntax";
 			break;

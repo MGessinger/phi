@@ -19,7 +19,7 @@ Expr* newNumberExpr (double val)
 	if (ne == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory.", 0x100);
+		return logError("Could not allocate Memory.", 0x101);
 	}
 	ne->val = val;
 	e->expr = ne;
@@ -35,7 +35,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	if (be == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory.", 0x100 + expr_binop);
+		return logError("Could not allocate Memory.", 0x102);
 	}
 	be->op = binop;
 	be->LHS = LHS;
@@ -53,7 +53,7 @@ Expr* newIdentExpr (char *name)
 	if (ie == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory", 0x100 + expr_ident);
+		return logError("Could not allocate Memory.", 0x103);
 	}
 	ie->name = name;
 	e->expr = ie;
@@ -69,7 +69,7 @@ Expr* newProtoExpr (char *name, stack *in, stack *out)
 	if (pe == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory.", 0x100 + expr_proto);
+		return logError("Could not allocate Memory.", 0x104);
 	}
 	pe->name = name;
 	pe->inArgs = in;
@@ -87,7 +87,7 @@ Expr* newFunctionExpr (Expr *proto, Expr *body)
 	if (fe == NULL)
 	{
 		free(e);
-		return logError("Could not allocate Memory.", 0x100 + expr_func);
+		return logError("Could not allocate Memory.", 0x105);
 	}
 	fe->proto = proto;
 	fe->body = body;
