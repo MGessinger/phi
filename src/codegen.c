@@ -51,20 +51,16 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 	const char *valName;
 	size_t length;
 
-	LLVMValueRef v;
 	stack *runner = namesInScope;
 	while (runner != NULL)
 	{
-		v = runner->item;
+		LLVMValueRef v = runner->item;
 		valName = LLVMGetValueName2(v, &length);
-		if (strncmp(valName, ie->name, length))
+		if (strncmp(valName, ie->name, length) == 0)
 			return v;
 		runner = runner->next;
 	}
-	v = LLVMGetNamedFunction(phi_module, ie->name);
-	if (v == NULL)
-		return logError("Unrecognized identifier!", 0x2004);
-	return v;
+	return logError("Unrecognized identifier!", 0x2004);
 }
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
