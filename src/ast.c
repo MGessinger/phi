@@ -1,30 +1,32 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "ast.h"
 
-unsigned bredth (Expr *e)
+unsigned breadth (Expr *e)
 {
 	unsigned br = 0;
 	while (e->expr_type == expr_comm)
 	{
 		br++;
 		CommandExpr *ce = e->expr;
-		e = ce->es[1];
+		e = ce->es[0];
 	}
 	return br+1;
 }
 
-Expr **flatten (Expr *args, unsigned bredth)
+Expr **flatten (Expr *args, unsigned breadth)
 {
-	Expr **flat = malloc(bredth * sizeof(Expr*));
+	Expr **flat = malloc(breadth * sizeof(Expr*));
 	if (flat == NULL)
 		return logError("Could not allocate Memory.", 0x108);
-	for (unsigned i = 0; i >= 1; i--)
+	for (unsigned i = breadth-1; i >= 1; i--)
 	{
 		CommandExpr *ce = args->expr;
 		free(args);
 
-		flat[i] = ce->es[2];
-		args = ce->es[1];
+		flat[i] = ce->es[1];
+		args = ce->es[0];
+		free(ce);
 	}
 	flat[0] = args;
 	return flat;
@@ -162,7 +164,7 @@ Expr* newCallExpr (Expr *funcRef, Expr *args)
 	ce->funcRef = ne->funcRef;
 	clearExpr(funcRef);
 
-	ce->numArgs = bredth(args);
+	ce->numArgs = breadth(args);
 	ce->args = flatten(args, ce->numArgs);
 	if (ce->args == NULL)
 	{

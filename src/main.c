@@ -21,7 +21,6 @@ void printUsageInfo()
 
 int main (int argc, char **argv)
 {
-	argv[0] = "";
 	initialiseLLVM();
 	for (int i = 1; i < argc; i++)
 	{
@@ -29,6 +28,7 @@ int main (int argc, char **argv)
 		{
 			yyin = fopen(argv[i], "r");
 			yyparse();
+			fclose(yyin);
 		}
 		else
 		{
