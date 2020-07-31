@@ -17,8 +17,8 @@
 %token keyword_new keyword_extern keyword_just
 %token <numerical> type_number type_string type_bool
 
-%type <numerical>		TYPEARG
-%type <string>	DECBODY
+%type <numerical>	TYPEARG
+%type <string>		DECBODY
 %type <pointer>		DECLARATION DEFINITION TYPESIG
 %type <pointer>		TOPLEVEL COMMAND EXPRESSION PRIMARY BINARYOP MALFORMED
 
@@ -31,7 +31,7 @@
 %{
 	int yylex();
 	int yyerror();
-	void printError(const char *errmsg, int errcode);
+	void printError (const char *errmsg, int errcode);
 	int needsName;
 #define ERROR(a,b) { logError(a, b); YYERROR; }
 %}
@@ -46,7 +46,7 @@ TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
 		DECLARATION		{ printf("Parsed external declaration\n");	$$ = $3; }
 	 | keyword_new			{ needsName = 1; }
 		DEFINITION		{ printf("Parsed function definition\n");	$$ = $3; }
-	 | keyword_just COMMAND	{ printf("Parsed top-level command\n");
+	 | keyword_just COMMAND		{ printf("Parsed top-level command\n");
 					  char *name = malloc(sizeof(char));
 					  name[0] = '\0';
 					  Expr *anon = newProtoExpr (name, NULL, NULL);

@@ -21,15 +21,11 @@ void printUsageInfo()
 
 int main (int argc, char **argv)
 {
-	initialiseLLVM();
+	stack *filesToParse = NULL;
 	for (int i = 1; i < argc; i++)
 	{
 		if (argv[i][0] != '-')
-		{
-			yyin = fopen(argv[i], "r");
-			yyparse();
-			fclose(yyin);
-		}
+			filesToParse = push(argv[i], 0, filesToParse);
 		else
 		{
 			switch (argv[i][1])
@@ -43,6 +39,16 @@ int main (int argc, char **argv)
 					break;
 			}
 		}
+	}
+	initialiseLLVM();
+	if (filesToParse == NULL)
+		yyparse();
+	while (filesToParse != NULL)
+	{
+		const char *file = pop(&filesToParse);
+		yyin = fopen(file, "r");
+		yyparse();
+		fclose(yyin);
 	}
 	yylex_destroy();
 	shutdownLLVM();
