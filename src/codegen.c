@@ -1,6 +1,7 @@
 #include <llvm-c/Types.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
+#include <llvm-c/Transforms/Scalar.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,8 +13,20 @@
 static LLVMContextRef phi_context;
 static LLVMModuleRef phi_module;
 static LLVMBuilderRef phi_builder;
+static LLVMPassManagerRef phi_passManager;
 
 static stack *namesInScope;
+
+LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
+{
+	LLVMPassManagerRef pmr = LLVMCreateFunctionPassManagerForModule(m);
+	LLVMAddInstructionCombiningPass(pmr);
+	LLVMAddReassociatePass(pmr);
+	LLVMAddGVNPass(pmr);
+	LLVMAddCFGSimplificationPass(pmr);
+	LLVMAddConstantPropagationPass(pmr);
+	return pmr;
+}
 
 void initialiseLLVM ()
 {
@@ -23,6 +36,7 @@ void initialiseLLVM ()
 	phi_context = LLVMGetGlobalContext();
 	phi_builder = LLVMCreateBuilderInContext(phi_context);
 	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
+	phi_passManager = setupPassManager(phi_module);
 	namesInScope = NULL;
 }
 
@@ -31,6 +45,8 @@ void shutdownLLVM ()
 	clearStack(namesInScope, NULL);
 	LLVMDisposeBuilder(phi_builder);
 	LLVMDumpModule(phi_module);
+	LLVMFinalizeFunctionPassManager(phi_passManager);
+	LLVMDisposePassManager(phi_passManager);
 	LLVMDisposeModule(phi_module);
 	LLVMShutdown();
 }
@@ -133,9 +149,11 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	}
 	else if (LLVMCountBasicBlocks(function) != 0)
 		return logError("Cannot redefine function. This definition will be ignored.", 0x2003);
+	unsigned paramCount = LLVMCountParams(function);
+	if (paramCount != depth(pe->inArgs))
+		return logError("Mismatch between prototype and definition!", 0x2004);
 
 	/* Give names to the function arguments. That way we can refer back to them in the function body. */
-	unsigned paramCount = LLVMCountParams(function);
 	LLVMValueRef *args = malloc(paramCount * sizeof(LLVMValueRef));
 	if (args == NULL)
 		return logError("Could not read arguments.", 0x2004);
@@ -162,6 +180,7 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	}
 	LLVMBuildRet(phi_builder, body);
 	LLVMVerifyFunction(function, LLVMPrintMessageAction);
+	LLVMRunFunctionPassManager(phi_passManager, function);
 
 	/* Remove local variables from the scope.
 	 * Note: These are precisely the first paramCount items on the stack */

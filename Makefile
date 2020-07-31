@@ -1,7 +1,7 @@
 LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs core)
 CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic -Isrc -I.
 
-OBJS = parser.h lexer.o parser.o ast.o codegen.o stack.o main.o
+OBJS = lexer.o parser.o ast.o codegen.o stack.o main.o
 NAME = phi
 
 VPATH = src
@@ -12,9 +12,7 @@ all: $(NAME)
 .y.h:
 	$(YACC) --defines=$@ $<
 
-%.o : parser.h %.c
-
-$(NAME): $(OBJS)
+$(NAME): parser.h $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LLVMFLAGS)
 
 clean:
