@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "parser.h"
 #include "ast.h"
@@ -7,46 +8,43 @@
 
 int yylex();
 int yylex_destroy();
+extern FILE *yyin;
 
-/*
-Expr* handleDefinition ()
-{
-	Expr* e = parseDefinition();
-	fprintf(stderr, "Parsed a Function Definition\n");
-	if (e == NULL)
-		gettok();
-	return e;
-}
+const char *version = "0.0.1";
 
-Expr* handleExtern ()
+void printUsageInfo()
 {
-	Expr* e = parseExtern();
-	fprintf(stderr, "Parsed an external Prototype\n");
-	if (e == NULL)
-		gettok();
-	return e;
+	printf( "This is Phi v%s\n", version);
+	printf( "Usage: phi [Filename]\n"
+		"If Filename is -, read from stdin.\n");
 }
-
-Expr* handleTopLevelExpr ()
-{
-	Expr* e = parseTopLevelExpr();
-	fprintf(stderr, "Parsed a top-level expression.\n");
-	if (e == NULL)
-		gettok();
-	return e;
-}
-*/
 
 int main (int argc, char **argv)
 {
-	if (argc > 1)
-		return -1;
-	argv[0] = '\0';
-
+	argv[0] = "";
 	initialiseLLVM();
-	yyparse();
+	for (int i = 1; i < argc; i++)
+	{
+		if (argv[i][0] != '-')
+		{
+			yyin = fopen(argv[i], "r");
+			yyparse();
+		}
+		else
+		{
+			switch (argv[i][1])
+			{
+				case '\0':
+					yyin = stdin;
+					yyparse();
+					break;
+				case 'h':
+					printUsageInfo();
+					break;
+			}
+		}
+	}
 	yylex_destroy();
 	shutdownLLVM();
-
 	return 0;
 }
