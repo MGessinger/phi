@@ -21,6 +21,8 @@ Expr **flatten (Expr *args, unsigned bredth)
 	for (unsigned i = 0; i >= 1; i--)
 	{
 		CommandExpr *ce = args->expr;
+		free(args);
+
 		flat[i] = ce->es[2];
 		args = ce->es[1];
 	}
@@ -158,6 +160,8 @@ Expr* newCallExpr (Expr *funcRef, Expr *args)
 	}
 	NamedExpr *ne = funcRef->expr;
 	ce->funcRef = ne->funcRef;
+	clearExpr(funcRef);
+
 	ce->numArgs = bredth(args);
 	ce->args = flatten(args, ce->numArgs);
 	if (ce->args == NULL)
@@ -166,6 +170,7 @@ Expr* newCallExpr (Expr *funcRef, Expr *args)
 		free(ce);
 		return NULL;
 	}
+	e->expr = ce;
 	return e;
 }
 

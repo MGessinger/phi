@@ -174,6 +174,23 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	return function;
 }
 
+LLVMValueRef codegenCallExpr (CallExpr *ce)
+{
+	unsigned expectedArgs = LLVMCountParams(ce->funcRef);
+	if (expectedArgs != ce->numArgs)
+		return logError("Incorrect number of arguments given to function!", 0x2005);
+
+	LLVMValueRef *args = malloc(sizeof(LLVMValueRef)*ce->numArgs);
+	if (args == NULL)
+		return logError("Could not create Function arguments.", 0x2006);
+	for (unsigned i = 0; i < ce->numArgs; i++)
+		args[i] = codegen(ce->args[i]);
+
+	LLVMValueRef callRef = LLVMBuildCall(phi_builder, ce->funcRef, args, ce->numArgs, "calltmp");
+	free(args);
+	return callRef;
+}
+
 LLVMValueRef codegen (Expr *e)
 {
 	if (e == NULL)
@@ -190,6 +207,8 @@ LLVMValueRef codegen (Expr *e)
 			return codegenProtoExpr(e->expr);
 		case expr_func:
 			return codegenFuncExpr(e->expr);
+		case expr_call:
+			return codegenCallExpr(e->expr);
 		default:
 			logError("Cannot generate IR for unrecognized expression type!", 0x2000);
 	}

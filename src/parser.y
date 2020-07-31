@@ -106,7 +106,11 @@ EXPRESSION : BINARYOP
 	   ;
 
 COMMAND : EXPRESSION
-	| COMMAND EXPRESSION		{ $$ = newCommandExpr($1, $2); }
+	| COMMAND EXPRESSION		{ Expr *new = $2;
+					  if (new->expr_type == expr_named)
+						$$ = newCallExpr($2, $1);
+					  else
+						$$ = newCommandExpr($1, $2); }
 	;
 
 PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
