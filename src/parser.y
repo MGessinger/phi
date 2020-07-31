@@ -110,7 +110,14 @@ COMMAND : EXPRESSION
 	;
 
 PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
-	| tok_ident			{ $$ = newIdentExpr($1); }
+	| tok_ident			{ LLVMValueRef fn = tryGetNamedFunc($1);
+					  if (fn != NULL)
+					  {
+						free($1);
+						$$ = newNamedExpr(fn);
+					  }
+					  else
+						$$ = newIdentExpr($1); }
 	| '(' COMMAND ')'		{ $$ = $2; }
 	| '(' COMMAND error		{ clearExpr($2); ERROR("Expected ')' while parsing Expression.", 0x1100); }
 	;

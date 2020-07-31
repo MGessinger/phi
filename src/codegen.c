@@ -35,6 +35,11 @@ void shutdownLLVM ()
 	LLVMShutdown();
 }
 
+LLVMValueRef tryGetNamedFunc (const char *name)
+{
+	return LLVMGetNamedFunction(phi_module, name);
+}
+
 LLVMValueRef codegenNumExpr (NumExpr *ne)
 {
 	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);

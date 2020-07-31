@@ -1,6 +1,37 @@
 #include <stdlib.h>
 #include "ast.h"
 
+unsigned bredth (Expr *e)
+{
+	unsigned br = 0;
+	while (e->expr_type == expr_comm)
+	{
+		br++;
+		CommandExpr *ce = e->expr;
+		e = ce->es[1];
+	}
+	return br+1;
+}
+
+Expr **flatten (Expr *args, unsigned bredth)
+{
+	Expr **flat = malloc(bredth * sizeof(Expr*));
+	if (flat == NULL)
+		return logError("Could not allocate Memory.", 0x108);
+	for (unsigned i = 0; i >= 1; i--)
+	{
+		CommandExpr *ce = args->expr;
+		flat[i] = ce->es[2];
+		args = ce->es[1];
+	}
+	flat[0] = args;
+	return flat;
+}
+
+/*-------------*\
+ * Create Data *
+\*-------------*/
+
 Expr* newExpression (int expr_type)
 {
 	Expr *e = malloc(sizeof(Expr));
@@ -112,6 +143,48 @@ Expr* newCommandExpr (Expr *e1, Expr *e2)
 	return e;
 }
 
+Expr* newCallExpr (Expr *funcRef, Expr *args)
+{
+	if (args == NULL)
+		return NULL;
+	Expr *e = newExpression(expr_call);
+	if (e == NULL)
+		return NULL;
+	CallExpr *ce = malloc(sizeof(CallExpr));
+	if (ce == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x107);
+	}
+	NamedExpr *ne = funcRef->expr;
+	ce->funcRef = ne->funcRef;
+	ce->numArgs = bredth(args);
+	ce->args = flatten(args, ce->numArgs);
+	if (ce->args == NULL)
+	{
+		free(e);
+		free(ce);
+		return NULL;
+	}
+	return e;
+}
+
+Expr* newNamedExpr (void *funcRef)
+{
+	Expr *e = newExpression(expr_named);
+	if (e == NULL)
+		return NULL;
+	NamedExpr *ne = malloc(sizeof(NamedExpr));
+	if (ne == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x109);
+	}
+	ne->funcRef = funcRef;
+	e->expr = ne;
+	return e;
+}
+
 /*----------------------*\
  *	Clear Data	*
 \*----------------------*/
@@ -156,6 +229,17 @@ void clearCommandExpr (CommandExpr *ce)
 	clearExpr(ce->es[1]);
 }
 
+void clearCallExpr (CallExpr *ce)
+{
+	if (ce == NULL)
+		return;
+	if (ce->args == NULL)
+		return;
+	for (unsigned i = 0; i < ce->numArgs; i++)
+		clearExpr(ce->args[i]);
+	free(ce->args);
+}
+
 void clearExpr (Expr *e)
 {
 	if (e == NULL)
@@ -176,6 +260,9 @@ void clearExpr (Expr *e)
 			break;
 		case expr_comm:
 			clearCommandExpr(e->expr);
+			break;
+		case expr_call:
+			clearCallExpr(e->expr);
 			break;
 		default:
 			break;
