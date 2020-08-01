@@ -4,6 +4,8 @@
 
 unsigned breadth (Expr *e)
 {
+	if (e == NULL)
+		return 0;
 	unsigned br = 0;
 	while (e->expr_type == expr_comm)
 	{
@@ -16,6 +18,8 @@ unsigned breadth (Expr *e)
 
 Expr **flatten (Expr *args, unsigned breadth)
 {
+	if (breadth == 0)
+		return NULL;
 	Expr **flat = malloc(breadth * sizeof(Expr*));
 	if (flat == NULL)
 		return logError("Could not allocate Memory.", 0x108);
@@ -149,8 +153,6 @@ Expr* newCommandExpr (Expr *e1, Expr *e2)
 
 Expr* newCallExpr (Expr *funcRef, Expr *args)
 {
-	if (args == NULL)
-		return NULL;
 	Expr *e = newExpression(expr_call);
 	if (e == NULL)
 		return NULL;
@@ -166,7 +168,7 @@ Expr* newCallExpr (Expr *funcRef, Expr *args)
 
 	ce->numArgs = breadth(args);
 	ce->args = flatten(args, ce->numArgs);
-	if (ce->args == NULL)
+	if (ce->numArgs != 0 && ce->args == NULL)
 	{
 		free(e);
 		free(ce);

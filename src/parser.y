@@ -105,7 +105,11 @@ EXPRESSION : BINARYOP
 	   | MALFORMED
 	   ;
 
-COMMAND : EXPRESSION
+COMMAND : EXPRESSION			{ Expr *new = $1;
+					  if (new->expr_type == expr_named)
+						$$ = newCallExpr($1, NULL);
+					  else
+						$$ = $1; }
 	| COMMAND EXPRESSION		{ Expr *new = $2;
 					  if (new->expr_type == expr_named)
 						$$ = newCallExpr($2, $1);
