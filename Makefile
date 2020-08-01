@@ -1,4 +1,4 @@
-LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs core)
+LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs all)
 CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic -Isrc -I.
 
 OBJS = lexer.o parser.o ast.o codegen.o stack.o main.o

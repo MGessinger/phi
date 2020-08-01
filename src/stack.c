@@ -32,7 +32,7 @@ void clearStack (stack *head, void (*clear)(void*))
 			clear(head->item);
 		free(head);
 		head = nextHead;
-	} 
+	}
 }
 
 unsigned depth (stack *head)

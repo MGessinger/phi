@@ -1,7 +1,6 @@
 #include <llvm-c/Types.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
-#include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
@@ -17,6 +16,7 @@ static LLVMContextRef phi_context;
 static LLVMModuleRef phi_module;
 static LLVMBuilderRef phi_builder, alloca_builder;
 static LLVMPassManagerRef phi_passManager;
+static LLVMTargetMachineRef phi_targetMachine;
 
 static stack *namesInScope;
 
@@ -50,15 +50,12 @@ LLVMBool setupTargetMachine ()
 		return 0;
 	}
 
-	LLVMTargetMachineRef TM = LLVMCreateTargetMachine(Target, triple, "generic", "",
-								LLVMCodeGenLevelDefault,
-								LLVMRelocDefault,
-								LLVMCodeModelDefault);
-	LLVMTargetDataRef targetData = LLVMCreateTargetDataLayout(TM);
+	phi_targetMachine = LLVMCreateTargetMachine(Target, triple, "generic", "",
+			LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
+	LLVMTargetDataRef targetData = LLVMCreateTargetDataLayout(phi_targetMachine);
 	LLVMSetModuleDataLayout(phi_module, targetData);
 	LLVMSetTarget(phi_module, triple);
 	LLVMDisposeMessage(triple);
-	LLVMDisposeTargetMachine(TM);
 	LLVMDisposeTargetData(targetData);
 	return 1;
 }
@@ -82,10 +79,20 @@ void initialiseLLVM ()
 void shutdownLLVM ()
 {
 	clearStack(namesInScope, NULL);
+
+	LLVMDumpModule(phi_module);
+	char *errorMsg;
+	LLVMBool emitSuccess = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, "output.o", LLVMObjectFile, &errorMsg);
+	if (emitSuccess != 0)
+	{
+		logError(errorMsg, 0x2800);
+		LLVMDisposeMessage(errorMsg);
+	}
+
 	LLVMDisposeBuilder(phi_builder);
 	LLVMDisposeBuilder(alloca_builder);
-	LLVMDumpModule(phi_module);
 	LLVMFinalizeFunctionPassManager(phi_passManager);
+	LLVMDisposeTargetMachine(phi_targetMachine);
 	LLVMDisposePassManager(phi_passManager);
 	LLVMDisposeModule(phi_module);
 	LLVMShutdown();
