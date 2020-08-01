@@ -3,8 +3,6 @@
 
 unsigned breadth (Expr *e)
 {
-	if (e == NULL)
-		return 0;
 	unsigned br = 0;
 	while (e->expr_type == expr_comm)
 	{
@@ -13,26 +11,6 @@ unsigned breadth (Expr *e)
 		e = ce->es[0];
 	}
 	return br+1;
-}
-
-Expr **flatten (Expr *args, unsigned breadth)
-{
-	if (breadth == 0)
-		return NULL;
-	Expr **flat = malloc(breadth * sizeof(Expr*));
-	if (flat == NULL)
-		return logError("Could not allocate Memory.", 0x108);
-	for (unsigned i = breadth-1; i >= 1; i--)
-	{
-		CommandExpr *ce = args->expr;
-		free(args);
-
-		flat[i] = ce->es[1];
-		args = ce->es[0];
-		free(ce);
-	}
-	flat[0] = args;
-	return flat;
 }
 
 /*-------------*\
@@ -82,7 +60,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	return e;
 }
 
-Expr* newIdentExpr (char *name)
+Expr* newIdentExpr (char *name, int flag)
 {
 	Expr *e = newExpression(expr_ident);
 	if (e == NULL)
@@ -94,6 +72,7 @@ Expr* newIdentExpr (char *name)
 		return logError("Could not allocate Memory.", 0x103);
 	}
 	ie->name = name;
+	ie->flag = flag;
 	e->expr = ie;
 	return e;
 }

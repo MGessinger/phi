@@ -2,6 +2,7 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Transforms/Scalar.h>
+#include <llvm-c/Transforms/Utils.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,7 +13,7 @@
 
 static LLVMContextRef phi_context;
 static LLVMModuleRef phi_module;
-static LLVMBuilderRef phi_builder;
+static LLVMBuilderRef phi_builder, alloca_builder;
 static LLVMPassManagerRef phi_passManager;
 
 static stack *namesInScope;
@@ -25,6 +26,7 @@ LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
 	LLVMAddGVNPass(pmr);
 	LLVMAddCFGSimplificationPass(pmr);
 	LLVMAddConstantPropagationPass(pmr);
+	LLVMAddPromoteMemoryToRegisterPass(pmr);
 	return pmr;
 }
 
@@ -35,6 +37,7 @@ void initialiseLLVM ()
 
 	phi_context = LLVMGetGlobalContext();
 	phi_builder = LLVMCreateBuilderInContext(phi_context);
+	alloca_builder = LLVMCreateBuilderInContext(phi_context);
 	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
 	phi_passManager = setupPassManager(phi_module);
 	namesInScope = NULL;
@@ -44,11 +47,27 @@ void shutdownLLVM ()
 {
 	clearStack(namesInScope, NULL);
 	LLVMDisposeBuilder(phi_builder);
+	LLVMDisposeBuilder(alloca_builder);
 	LLVMDumpModule(phi_module);
 	LLVMFinalizeFunctionPassManager(phi_passManager);
 	LLVMDisposePassManager(phi_passManager);
 	LLVMDisposeModule(phi_module);
 	LLVMShutdown();
+}
+
+LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, const char *name)
+{
+	LLVMBasicBlockRef entryBlock;
+	if (func == NULL)
+		entryBlock = LLVMGetInsertBlock(phi_builder);
+	else
+		entryBlock = LLVMGetEntryBasicBlock(func);
+	if (entryBlock == NULL)
+		return logError("Attempting to Create Variable in empty function!", 0x2601);
+	LLVMPositionBuilderAtEnd(alloca_builder, entryBlock);
+	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
+	LLVMValueRef alloca = LLVMBuildAlloca(alloca_builder, doubleType, name);
+	return alloca;
 }
 
 LLVMValueRef codegenNumExpr (NumExpr *ne)
@@ -61,16 +80,29 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 {
 	const char *valName;
 	size_t length;
+	size_t inplen = strlen(ie->name);
 
 	stack *runner = namesInScope;
+	if (ie->flag != id_var && ie->flag != id_any)
+		runner = NULL;
 	while (runner != NULL)
 	{
 		LLVMValueRef v = runner->item;
 		valName = LLVMGetValueName2(v, &length);
-		if (strncmp(valName, ie->name, length) == 0)
-			return v;
+		if (strncmp(valName, ie->name, inplen) == 0)
+		{
+			LLVMValueRef load = LLVMBuildLoad(phi_builder, v, valName);
+			return load;
+		}
 		runner = runner->next;
 	}
+
+	LLVMValueRef func = NULL;
+	if (ie->flag == id_func || ie->flag == id_any)
+		func = LLVMGetNamedFunction(phi_module, ie->name);
+	if (func != NULL)
+		return LLVMBuildCall(phi_builder, func, NULL, 0, "calltmp");
+
 	return logError("Unrecognized identifier!", 0x2101);
 }
 
@@ -84,6 +116,9 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
+		case ':':
+			val = r;
+			break;
 		case '+':
 			val = LLVMBuildFAdd(phi_builder, l, r, "addtmp");
 			break;
@@ -117,7 +152,7 @@ LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 	{
 		switch (runner->misc)
 		{
-			case tok_number:
+			case type_number:
 				args[i] = doubleType;
 				break;
 			default:
@@ -148,6 +183,10 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	if (paramCount != depth(pe->inArgs))
 		return logError("Mismatch between prototype and definition!", 0x2402);
 
+	/* Build function body recursively */
+	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(phi_context, function, "bodyEntry");
+	LLVMPositionBuilderAtEnd(phi_builder, bodyBlock);
+
 	/* Give names to the function arguments. That way we can refer back to them in the function body. */
 	LLVMValueRef args[paramCount];
 	LLVMGetParams(function, args);
@@ -156,13 +195,11 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		char *name = pop(&(pe->inArgs));
 		LLVMValueRef v = args[i];
 		LLVMSetValueName2(v, name, strlen(name));
-		namesInScope = push(v, 1, namesInScope);
+		LLVMValueRef alloca = CreateEntryPointAlloca(function, name);
+		LLVMBuildStore(phi_builder, v, alloca);
+		namesInScope = push(alloca, 1, namesInScope);
 		free(name);
 	}
-
-	/* Build function body recursively */
-	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(phi_context, function, "bodyEntry");
-	LLVMPositionBuilderAtEnd(phi_builder, bodyBlock);
 
 	LLVMValueRef body = codegen(fe->body);
 	if (body == NULL)
@@ -176,8 +213,8 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 
 	/* Remove local variables from the scope.
 	 * Note: These are precisely the first paramCount items on the stack */
-	for (unsigned i = 0; i < paramCount; i++)
-		pop(&namesInScope);
+	clearStack(namesInScope, NULL);
+	namesInScope = NULL;
 	return function;
 }
 
@@ -185,12 +222,43 @@ LLVMValueRef codegenCommandExpr (CommandExpr *ce)
 {
 	Expr *last = ce->es[1];
 	if (last->expr_type != expr_ident)
-		logError("A Command must end with an Identifier.", 0x2501);
+		logError("A Command must end with a function call or an assignment.", 0x2501);
 	IdentExpr *ie = last->expr;
+
+	/* First, see if the identifier should be a new Variable. If so, push it on the stack. */
+	if (ie->flag == id_new)
+	{
+		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, ie->name);
+		namesInScope = push(alloca, 1, namesInScope);
+	}
+	LLVMValueRef variable = NULL;
+	size_t len = strlen(ie->name);
+	stack *running = namesInScope;
+
+	/* Now test if we only want a function, and if not then query the variable stack.
+	 * If after this loop, we did not return, but a variable was requested, then abort. */
+	if (ie->flag == id_func)
+		running = NULL;
+	while (running != NULL)
+	{
+		variable = running->item;
+		const char *name = LLVMGetValueName(variable);
+		if (strncmp(name, ie->name, len) == 0)
+		{
+			LLVMValueRef value = codegen(ce->es[0]);
+			LLVMBuildStore(phi_builder, value, variable);
+			return value;
+		}
+		running = running->next;
+	}
+	if (ie->flag == id_var)
+		return logError("Found explicit Variable request with unknown identifier name!", 0x2502);
+
+	/* If the previous code did not execute, see if the identifier is a function. If so, call it.
+	 * The Code will only ever get to this point, if a function is allowed or demanded. */
 	LLVMValueRef func = LLVMGetNamedFunction(phi_module, ie->name);
 	if (func == NULL)
-		/* Temporary */ return logError("Unrecognized function at end of Command.", 0x2502);
-
+		return logError("Unrecognized identifier at end of Command.", 0x2503);
 	unsigned expectedArgs = LLVMCountParams(func);
 	if (expectedArgs != breadth(ce->es[0]))
 		return logError("Incorrect number of arguments given to function!", 0x2503);
@@ -206,8 +274,7 @@ LLVMValueRef codegenCommandExpr (CommandExpr *ce)
 	}
 	argValues[0] = codegen(args);
 
-	LLVMValueRef callRef = LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
-	return callRef;
+	return LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
 }
 
 LLVMValueRef codegenCondExpr (CondExpr *ce)

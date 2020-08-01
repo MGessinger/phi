@@ -3,6 +3,14 @@
 
 #include "stack.h"
 
+enum IdentifierFlags
+{
+	id_any,
+	id_var,
+	id_func,
+	id_new
+};
+
 enum Expressions
 {
 	expr_number,
@@ -32,6 +40,7 @@ typedef struct BinaryExprAST {
 
 typedef struct IdentExprAST {
 	char *name;
+	int flag;
 } IdentExpr;
 
 typedef struct CommandExprAST {
@@ -57,16 +66,15 @@ typedef struct CondExprAST {
 
 Expr* newNumberExpr (double val);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
-Expr* newIdentExpr (char *name);
+Expr* newIdentExpr (char *name, int flag);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 Expr* newCommandExpr (Expr *e1, Expr *e2);
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
 
-void* logError(const char *msg, int code);
+void* logError (const char *msg, int code);
 void clearExpr (Expr *e);
 
 unsigned breadth (Expr *e);
-Expr **flatten (Expr *args, unsigned breadth);
 
 #endif /* AST_H_ */

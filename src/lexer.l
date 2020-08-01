@@ -2,9 +2,10 @@
 #define YY_NO_INPUT
 #define YY_NO_UNPUT
 #include "parser.h"
-char *copyString (const char *str);
+char *copyString (const char *str, unsigned cutoff);
 %}
 %x COMMENT
+IDENT [a-zA-Z_]+
 %%
 "/*"			{ BEGIN(COMMENT); }
 <COMMENT>"*/"		{ BEGIN(INITIAL); }
@@ -24,19 +25,25 @@ Number			return type_number;
 String			return type_string;
 
 ([0-9]*".")?[0-9]+	{ yylval.numerical = strtod(yytext, NULL); return tok_number; }
-[a-zA-Z_]+		{ yylval.string = copyString(yytext); return tok_ident; }
+{IDENT}":!"		{ yylval.string = copyString(yytext, 2); return tok_new; }
+{IDENT}":v"		{ yylval.string = copyString(yytext, 2); return tok_var; }
+{IDENT}":f"		{ yylval.string = copyString(yytext, 2); return tok_func; }
+{IDENT}			{ yylval.string = copyString(yytext, 0); return tok_ident; }
+
 "->"			return tok_arr;
 
 .			return yytext[0];
 %%
-char* copyString (const char *str)
+char* copyString (const char *str, unsigned cutoff)
 {
 	if (str == NULL)
 		return NULL;
+	size_t len = strlen(str) - cutoff;
 	char *copy = malloc((strlen(str)+1)*sizeof(char));
 	if (copy == NULL)
 		return NULL;
 	strcpy(copy, str);
+	copy[len] = '\0';
 	return copy;
 }
 

@@ -15,16 +15,16 @@
 %token keyword_new keyword_extern keyword_just
 %token keyword_if keyword_else keyword_for
 %token <numerical>	tok_number tok_arr
-%token <string>		tok_ident
+%token <string>		tok_ident tok_new tok_var tok_func
 %token <numerical>	type_number type_string type_bool
 
 %type <numerical>	TYPEARG
 %type <string>		DECBODY
-%type <pointer>		TOPLEVEL MINIMAL COMMAND
+%type <pointer>		TOPLEVEL MINIMAL COMMAND QUEUE
 %type <pointer>		DECLARATION DEFINITION TYPESIG
 %type <pointer>		EXPRESSION PRIMARY BINARYOP MALFORMED IFBLOCK
 
-%right '='
+%right ':'
 
 %nonassoc '<' '>'
 
@@ -47,7 +47,7 @@ TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
 		DECLARATION		{ printf("Parsed external declaration\n");	$$ = $3; }
 	 | keyword_new			{ needsName = 1; }
 		DEFINITION		{ printf("Parsed function definition\n");	$$ = $3; }
-	 | keyword_just MINIMAL		{ printf("Parsed top-level command\n");
+	 | keyword_just QUEUE		{ printf("Parsed top-level command\n");
 					  char *name = malloc(sizeof(char));
 					  name[0] = '\0';
 					  Expr *anon = newProtoExpr (name, NULL, NULL);
@@ -56,6 +56,10 @@ TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
 
 /*===========================================*/
 /* Anything related to Statements comes here */
+
+QUEUE	: MINIMAL
+	| QUEUE ':' MINIMAL		{ $$ = newBinaryExpr(':', $1, $3); }
+	;
 
 MINIMAL : COMMAND
 	| IFBLOCK
@@ -84,9 +88,12 @@ BINARYOP : EXPRESSION '+' EXPRESSION	{ $$ = newBinaryExpr('+', $1, $3); }
 	 ;
 
 PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
-	| tok_ident			{ $$ = newIdentExpr($1); }
-	| '(' MINIMAL ')'		{ $$ = $2; }
-	| '(' MINIMAL error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1100); }
+	| tok_ident			{ $$ = newIdentExpr($1, id_any); }
+	| tok_new			{ $$ = newIdentExpr($1, id_new); }
+	| tok_func			{ $$ = newIdentExpr($1, id_func); }
+	| tok_var			{ $$ = newIdentExpr($1, id_var); }
+	| '(' QUEUE ')'			{ $$ = $2; }
+	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1100); }
 	;
 
 OP : '+' | '-' | '*' | '/' | '>' | '<' ;
@@ -97,7 +104,7 @@ MALFORMED : EXPRESSION OP error 	{ clearExpr($1); ERROR("Invalid right-hand Oper
 /*=================================================*/
 /* Anything related to Functions comes below here: */
 
-DEFINITION : DECLARATION MINIMAL	{ $$ = newFunctionExpr($1, $2); }
+DEFINITION : DECLARATION QUEUE		{ $$ = newFunctionExpr($1, $2); }
 	   ;
 
 DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
