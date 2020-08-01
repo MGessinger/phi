@@ -1,6 +1,8 @@
 #include <llvm-c/Types.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <stdlib.h>
@@ -30,6 +32,37 @@ LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
 	return pmr;
 }
 
+LLVMBool setupTargetMachine ()
+{
+	LLVMInitializeAllTargetInfos();
+	LLVMInitializeAllTargets();
+	LLVMInitializeAllTargetMCs();
+	LLVMInitializeAllAsmParsers();
+	LLVMInitializeAllAsmPrinters();
+
+	char *triple = LLVMGetDefaultTargetTriple();
+	LLVMTargetRef Target;
+	char *errorMsg;
+	if (LLVMGetTargetFromTriple(triple, &Target, &errorMsg) != 0)
+	{
+		logError(errorMsg, 0x2700);
+		LLVMDisposeMessage(errorMsg);
+		return 0;
+	}
+
+	LLVMTargetMachineRef TM = LLVMCreateTargetMachine(Target, triple, "generic", "",
+								LLVMCodeGenLevelDefault,
+								LLVMRelocDefault,
+								LLVMCodeModelDefault);
+	LLVMTargetDataRef targetData = LLVMCreateTargetDataLayout(TM);
+	LLVMSetModuleDataLayout(phi_module, targetData);
+	LLVMSetTarget(phi_module, triple);
+	LLVMDisposeMessage(triple);
+	LLVMDisposeTargetMachine(TM);
+	LLVMDisposeTargetData(targetData);
+	return 1;
+}
+
 void initialiseLLVM ()
 {
 	LLVMPassRegistryRef passreg = LLVMGetGlobalPassRegistry();
@@ -38,8 +71,11 @@ void initialiseLLVM ()
 	phi_context = LLVMGetGlobalContext();
 	phi_builder = LLVMCreateBuilderInContext(phi_context);
 	alloca_builder = LLVMCreateBuilderInContext(phi_context);
+
 	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
 	phi_passManager = setupPassManager(phi_module);
+	setupTargetMachine();
+
 	namesInScope = NULL;
 }
 
