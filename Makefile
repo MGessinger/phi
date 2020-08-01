@@ -13,7 +13,7 @@ all: $(NAME)
 	$(YACC) --defines=$@ $<
 
 $(NAME): parser.h $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LLVMFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LLVMFLAGS)
 
 clean:
 	rm $(OBJS)

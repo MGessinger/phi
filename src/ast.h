@@ -11,8 +11,7 @@ enum Expressions
 	expr_proto,
 	expr_func,
 	expr_comm,
-	expr_named,
-	expr_call
+	expr_conditional
 };
 
 /* General Expression type */
@@ -50,15 +49,11 @@ typedef struct FuncExprAST {
 	Expr *body;
 } FunctionExpr;
 
-typedef struct CallExprAST {
-	void *funcRef;
-	Expr **args;
-	unsigned numArgs;
-} CallExpr;
-
-typedef struct NamedExprAST {
-	void *funcRef;
-} NamedExpr;
+typedef struct CondExprAST {
+	Expr *Cond;
+	Expr *True;
+	Expr *False;
+} CondExpr;
 
 Expr* newNumberExpr (double val);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
@@ -66,10 +61,12 @@ Expr* newIdentExpr (char *name);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 Expr* newCommandExpr (Expr *e1, Expr *e2);
-Expr* newCallExpr (Expr *funcRef, Expr *args);
-Expr* newNamedExpr (void *funcRef);
+Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
 
 void* logError(const char *msg, int code);
 void clearExpr (Expr *e);
+
+unsigned breadth (Expr *e);
+Expr **flatten (Expr *args, unsigned breadth);
 
 #endif /* AST_H_ */

@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include "ast.h"
 
 unsigned breadth (Expr *e)
@@ -151,46 +150,21 @@ Expr* newCommandExpr (Expr *e1, Expr *e2)
 	return e;
 }
 
-Expr* newCallExpr (Expr *funcRef, Expr *args)
+Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False)
 {
-	Expr *e = newExpression(expr_call);
+	Expr *e = newExpression(expr_conditional);
 	if (e == NULL)
 		return NULL;
-	CallExpr *ce = malloc(sizeof(CallExpr));
+	CondExpr *ce = malloc(sizeof(CondExpr));
 	if (ce == NULL)
 	{
 		free(e);
 		return logError("Could not allocate Memory.", 0x107);
 	}
-	NamedExpr *ne = funcRef->expr;
-	ce->funcRef = ne->funcRef;
-	clearExpr(funcRef);
-
-	ce->numArgs = breadth(args);
-	ce->args = flatten(args, ce->numArgs);
-	if (ce->numArgs != 0 && ce->args == NULL)
-	{
-		free(e);
-		free(ce);
-		return NULL;
-	}
+	ce->Cond = Cond;
+	ce->True = True;
+	ce->False = False;
 	e->expr = ce;
-	return e;
-}
-
-Expr* newNamedExpr (void *funcRef)
-{
-	Expr *e = newExpression(expr_named);
-	if (e == NULL)
-		return NULL;
-	NamedExpr *ne = malloc(sizeof(NamedExpr));
-	if (ne == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x109);
-	}
-	ne->funcRef = funcRef;
-	e->expr = ne;
 	return e;
 }
 
@@ -238,15 +212,13 @@ void clearCommandExpr (CommandExpr *ce)
 	clearExpr(ce->es[1]);
 }
 
-void clearCallExpr (CallExpr *ce)
+void clearCondExpr (CondExpr *ce)
 {
 	if (ce == NULL)
 		return;
-	if (ce->args == NULL)
-		return;
-	for (unsigned i = 0; i < ce->numArgs; i++)
-		clearExpr(ce->args[i]);
-	free(ce->args);
+	clearExpr(ce->Cond);
+	clearExpr(ce->True);
+	clearExpr(ce->False);
 }
 
 void clearExpr (Expr *e)
@@ -270,8 +242,8 @@ void clearExpr (Expr *e)
 		case expr_comm:
 			clearCommandExpr(e->expr);
 			break;
-		case expr_call:
-			clearCallExpr(e->expr);
+		case expr_conditional:
+			clearCondExpr(e->expr);
 			break;
 		default:
 			break;
