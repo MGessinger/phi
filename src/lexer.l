@@ -5,7 +5,7 @@
 char *copyString (const char *str, unsigned cutoff);
 %}
 %x COMMENT
-IDENT [a-zA-Z_]+
+IDENT [a-zA-Z_][a-zA-Z0-9_]*
 %%
 "/*"			{ BEGIN(COMMENT); }
 <COMMENT>"*/"		{ BEGIN(INITIAL); }
@@ -21,17 +21,19 @@ if			return keyword_if;
 else			return keyword_else;
 
 Bool			return type_bool;
-Number			return type_number;
+Real			return type_real;
 String			return type_string;
 
-([0-9]*".")?[0-9]+	{ yylval.numerical = strtod(yytext, NULL); return tok_number; }
+-?([0-9]*".")?[0-9]+	{ yylval.numerical = strtod(yytext, NULL); return tok_number; }
+True			{ yylval.numerical = 1; return tok_bool; }
+False			{ yylval.numerical = 0; return tok_bool; }
+
 {IDENT}":!"		{ yylval.string = copyString(yytext, 2); return tok_new; }
 {IDENT}":v"		{ yylval.string = copyString(yytext, 2); return tok_var; }
 {IDENT}":f"		{ yylval.string = copyString(yytext, 2); return tok_func; }
 {IDENT}			{ yylval.string = copyString(yytext, 0); return tok_ident; }
 
 "->"			return tok_arr;
-
 .			return yytext[0];
 %%
 char* copyString (const char *str, unsigned cutoff)

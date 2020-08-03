@@ -4,8 +4,5 @@
 #include "ast.h"
 #include <llvm-c/Types.h>
 
-void initialiseLLVM ();
-void shutdownLLVM ();
-
-LLVMValueRef codegen (Expr *e);
+LLVMValueRef codegen (Expr *e, int newScope);
 #endif /* CODEGEN_H_ */

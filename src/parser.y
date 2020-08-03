@@ -14,9 +14,9 @@
 }
 %token keyword_new keyword_extern keyword_just
 %token keyword_if keyword_else keyword_for
-%token <numerical>	tok_number tok_arr
 %token <string>		tok_ident tok_new tok_var tok_func
-%token <numerical>	type_number type_string type_bool
+%token <numerical>	tok_number tok_bool tok_arr
+%token <numerical>	type_real type_string type_bool
 
 %type <numerical>	TYPEARG
 %type <string>		DECBODY
@@ -24,7 +24,7 @@
 %type <pointer>		DECLARATION DEFINITION TYPESIG
 %type <pointer>		EXPRESSION PRIMARY BINARYOP MALFORMED IFBLOCK
 
-%right ':'
+%right ':' '='
 
 %nonassoc '<' '>'
 
@@ -38,7 +38,7 @@
 %}
 %%
 INPUT :
-      | INPUT TOPLEVEL			{ codegen($2); clearExpr($2); }
+      | INPUT TOPLEVEL			{ codegen($2, 1); clearExpr($2); }
       ;
 
 TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
@@ -83,11 +83,13 @@ BINARYOP : EXPRESSION '+' EXPRESSION	{ $$ = newBinaryExpr('+', $1, $3); }
 	 | EXPRESSION '-' EXPRESSION	{ $$ = newBinaryExpr('-', $1, $3); }
 	 | EXPRESSION '*' EXPRESSION	{ $$ = newBinaryExpr('*', $1, $3); }
 	 | EXPRESSION '/' EXPRESSION	{ $$ = newBinaryExpr('/', $1, $3); }
-	 | EXPRESSION '>' EXPRESSION	{ $$ = newBinaryExpr('>', $1, $3); }
 	 | EXPRESSION '<' EXPRESSION	{ $$ = newBinaryExpr('<', $1, $3); }
+	 | EXPRESSION '>' EXPRESSION	{ $$ = newBinaryExpr('<', $3, $1); } /* Switched the Arguments! */
+	 | EXPRESSION '=' EXPRESSION	{ $$ = newBinaryExpr('=', $1, $3); }
 	 ;
 
-PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
+PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
+	| tok_number			{ $$ = newLiteralExpr($1, lit_number); }
 	| tok_ident			{ $$ = newIdentExpr($1, id_any); }
 	| tok_new			{ $$ = newIdentExpr($1, id_new); }
 	| tok_func			{ $$ = newIdentExpr($1, id_func); }
@@ -96,7 +98,7 @@ PRIMARY : tok_number			{ $$ = newNumberExpr($1); }
 	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1100); }
 	;
 
-OP : '+' | '-' | '*' | '/' | '>' | '<' ;
+OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' ;
 
 MALFORMED : EXPRESSION OP error 	{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1500); }
 	  ;
@@ -132,15 +134,15 @@ DECBODY : tok_ident			{ needsName = 0; }
 	;
 
 TYPESIG :				{ $$ = NULL; }
-	| TYPESIG TYPEARG ':' tok_ident	{ $$ = push($4, $2, $1); }
+	| TYPESIG TYPEARG ':' tok_ident	{ $$ = push($4, (int)$2, $1); }
 	| TYPESIG TYPEARG		{ if (needsName)
 						ERROR("All function parameters must be named in the form \"Type:Name\"!", 0x1300);
 					  $$ = push(NULL, $2, $1); }
 	;
 
-TYPEARG : type_number
-	| type_string
-	| type_bool
+TYPEARG : type_real			{ $$ = (double)type_real; }
+	| type_string			{ $$ = (double)type_string; }
+	| type_bool			{ $$ = (double)type_bool; }
 	;
 %%
 int yyerror()

@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "parser.h"
-#include "ast.h"
-#include "codegen.h"
+#include "stack.h"
+#include "llvmcontrol.h"
 
 int yylex();
 int yylex_destroy();
+int yyparse();
 extern FILE *yyin;
 
 const char *version = "0.0.1";
@@ -51,6 +51,6 @@ int main (int argc, char **argv)
 		fclose(yyin);
 	}
 	yylex_destroy();
-	shutdownLLVM();
+	shutdownLLVM(0);
 	return 0;
 }

@@ -1,9 +1,6 @@
 #include <llvm-c/Types.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
-#include <llvm-c/TargetMachine.h>
-#include <llvm-c/Transforms/Scalar.h>
-#include <llvm-c/Transforms/Utils.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,94 +8,31 @@
 #include "ast.h"
 #include "parser.h"
 #include "codegen.h"
+#include "binaryops.h"
 
-static LLVMContextRef phi_context;
-static LLVMModuleRef phi_module;
-static LLVMBuilderRef phi_builder, alloca_builder;
-static LLVMPassManagerRef phi_passManager;
-static LLVMTargetMachineRef phi_targetMachine;
+LLVMContextRef phi_context;
+LLVMModuleRef phi_module;
+LLVMBuilderRef phi_builder, alloca_builder;
+extern LLVMPassManagerRef phi_passManager;
 
-static stack *namesInScope;
+static stack *namesInScope = NULL;
+static int scope = 0;
 
-LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
+LLVMTypeRef getAppropriateType (int typename)
 {
-	LLVMPassManagerRef pmr = LLVMCreateFunctionPassManagerForModule(m);
-	LLVMAddInstructionCombiningPass(pmr);
-	LLVMAddReassociatePass(pmr);
-	LLVMAddGVNPass(pmr);
-	LLVMAddCFGSimplificationPass(pmr);
-	LLVMAddConstantPropagationPass(pmr);
-	LLVMAddPromoteMemoryToRegisterPass(pmr);
-	return pmr;
-}
-
-LLVMBool setupTargetMachine ()
-{
-	LLVMInitializeAllTargetInfos();
-	LLVMInitializeAllTargets();
-	LLVMInitializeAllTargetMCs();
-	LLVMInitializeAllAsmParsers();
-	LLVMInitializeAllAsmPrinters();
-
-	char *triple = LLVMGetDefaultTargetTriple();
-	LLVMTargetRef Target;
-	char *errorMsg;
-	if (LLVMGetTargetFromTriple(triple, &Target, &errorMsg) != 0)
+	switch (typename)
 	{
-		logError(errorMsg, 0x2700);
-		LLVMDisposeMessage(errorMsg);
-		return 0;
+		case type_real:
+			return LLVMDoubleTypeInContext(phi_context);
+		case type_bool:
+			return LLVMInt1TypeInContext(phi_context);
+		default:
+			return logError("Unknown Type Name!", 0x2301);
 	}
-
-	phi_targetMachine = LLVMCreateTargetMachine(Target, triple, "generic", "",
-			LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
-	LLVMTargetDataRef targetData = LLVMCreateTargetDataLayout(phi_targetMachine);
-	LLVMSetModuleDataLayout(phi_module, targetData);
-	LLVMSetTarget(phi_module, triple);
-	LLVMDisposeMessage(triple);
-	LLVMDisposeTargetData(targetData);
-	return 1;
+	return NULL;
 }
 
-void initialiseLLVM ()
-{
-	LLVMPassRegistryRef passreg = LLVMGetGlobalPassRegistry();
-	LLVMInitializeCore(passreg);
-
-	phi_context = LLVMGetGlobalContext();
-	phi_builder = LLVMCreateBuilderInContext(phi_context);
-	alloca_builder = LLVMCreateBuilderInContext(phi_context);
-
-	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
-	phi_passManager = setupPassManager(phi_module);
-	setupTargetMachine();
-
-	namesInScope = NULL;
-}
-
-void shutdownLLVM ()
-{
-	clearStack(namesInScope, NULL);
-
-	LLVMDumpModule(phi_module);
-	char *errorMsg;
-	LLVMBool emitSuccess = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, "output.o", LLVMObjectFile, &errorMsg);
-	if (emitSuccess != 0)
-	{
-		logError(errorMsg, 0x2800);
-		LLVMDisposeMessage(errorMsg);
-	}
-
-	LLVMDisposeBuilder(phi_builder);
-	LLVMDisposeBuilder(alloca_builder);
-	LLVMFinalizeFunctionPassManager(phi_passManager);
-	LLVMDisposeTargetMachine(phi_targetMachine);
-	LLVMDisposePassManager(phi_passManager);
-	LLVMDisposeModule(phi_module);
-	LLVMShutdown();
-}
-
-LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, const char *name)
+LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, LLVMTypeRef varType, const char *name)
 {
 	LLVMBasicBlockRef entryBlock;
 	if (func == NULL)
@@ -106,17 +40,26 @@ LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, const char *name)
 	else
 		entryBlock = LLVMGetEntryBasicBlock(func);
 	if (entryBlock == NULL)
-		return logError("Attempting to Create Variable in empty function!", 0x2601);
+		return logError("Attempting to Create Variable in empty function!", 0x2202);
 	LLVMPositionBuilderAtEnd(alloca_builder, entryBlock);
-	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
-	LLVMValueRef alloca = LLVMBuildAlloca(alloca_builder, doubleType, name);
+	LLVMValueRef alloca = LLVMBuildAlloca(alloca_builder, varType, name);
 	return alloca;
 }
 
-LLVMValueRef codegenNumExpr (NumExpr *ne)
+LLVMValueRef codegenLiteralExpr (LiteralExpr *le)
 {
 	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
-	return LLVMConstReal(doubleType, ne->val);
+	LLVMTypeRef boolType = LLVMInt1TypeInContext(phi_context);
+	switch (le->type)
+	{
+		case lit_number:
+			return LLVMConstReal(doubleType, le->val);
+		case lit_bool:
+			return LLVMConstInt(boolType, (le->val)!=0, 0);
+		default:
+			return logError("Unknown literal type.", 0x200);
+	}
+	return NULL;
 }
 
 LLVMValueRef codegenIdentExpr (IdentExpr *ie)
@@ -146,66 +89,64 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 	if (func != NULL)
 		return LLVMBuildCall(phi_builder, func, NULL, 0, "calltmp");
 
-	return logError("Unrecognized identifier!", 0x2101);
+	return logError("Unrecognized identifier!", 0x2401);
 }
+
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 {
-	LLVMValueRef l = codegen(be->LHS);
-	LLVMValueRef r = codegen(be->RHS);
+	LLVMValueRef l = codegen(be->LHS, 0);
+	LLVMValueRef r = codegen(be->RHS, 0);
 	if (l == NULL || r == NULL)
 		return NULL;
 
-	LLVMValueRef val = NULL;
+	LLVMTypeRef lhsType = LLVMTypeOf(l);
+	LLVMTypeRef rhsType = LLVMTypeOf(r);
+
+	LLVMTypeRef doubletype = LLVMDoubleTypeInContext(phi_context);
 	switch (be->op)
 	{
 		case ':':
-			val = r;
-			break;
+			return r;
 		case '+':
-			val = LLVMBuildFAdd(phi_builder, l, r, "addtmp");
-			break;
+			return buildAppropriateAddition(l, r);
 		case '-':
-			val = LLVMBuildFSub(phi_builder, l, r, "subtmp");
-			break;
+			if (lhsType != doubletype || rhsType != doubletype)
+				return logError("Cannot subtract variables of type other than Real", 0x2502);
+			return LLVMBuildFSub(phi_builder, l, r, "subtmp");
 		case '*':
-			val = LLVMBuildFMul(phi_builder, l, r, "multmp");
-			break;
+			return buildAppropriateMultiplication(l, r);
+		case '/':
+			if (lhsType != doubletype || rhsType != doubletype)
+				return logError("Cannot subtract variables of type other than Real", 0x2502);
+			return LLVMBuildFDiv(phi_builder, l, r, "divtmp");
 		case '<':
-			val = LLVMBuildFCmp(phi_builder, LLVMRealOLT, l, r, "lttmp");
-			break;
-		case '>':
-			val = LLVMBuildFCmp(phi_builder, LLVMRealOGT, l, r, "gttmp");
-			break;
+			return buildAppropriateCmp(l, r);
+		case '=':
+			return buildAppropriateEq(l, r);
 		default:
-			val = logError("Unrecognized binary operator!", 0x2201);
-			break;
+			return logError("Unrecognized binary operator!", 0x2501);
 	}
-	return val;
+	return NULL;
 }
 
 LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 {
-	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
 	int numOfInputArgs = depth(pe->inArgs);
 	LLVMTypeRef args[numOfInputArgs];
 	stack *runner = pe->inArgs;
-	/* Careful: This loop reverses the order of the arguments! */
 	for (int i = 0; i < numOfInputArgs; i++)
 	{
-		switch (runner->misc)
-		{
-			case type_number:
-				args[i] = doubleType;
-				break;
-			default:
-				args[i] = doubleType;
-				break;
-		}
+		args[i] = getAppropriateType(runner->misc);
 		runner = runner->next;
 	}
 
-	LLVMTypeRef funcType = LLVMFunctionType(doubleType, args, numOfInputArgs, 0);
+	LLVMTypeRef ret;
+	if (pe->outArgs == NULL)
+		ret = LLVMVoidTypeInContext(phi_context);
+	else
+		ret = getAppropriateType((pe->outArgs)->misc);
+	LLVMTypeRef funcType = LLVMFunctionType(ret, args, numOfInputArgs, 0);
 	return LLVMAddFunction(phi_module, pe->name, funcType);
 }
 
@@ -221,10 +162,10 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 			return NULL;
 	}
 	else if (LLVMCountBasicBlocks(function) != 0)
-		return logError("Cannot redefine function. This definition will be ignored.", 0x2401);
+		return logError("Cannot redefine function. This definition will be ignored.", 0x2601);
 	unsigned paramCount = LLVMCountParams(function);
 	if (paramCount != depth(pe->inArgs))
-		return logError("Mismatch between prototype and definition!", 0x2402);
+		return logError("Mismatch between prototype and definition!", 0x2602);
 
 	/* Build function body recursively */
 	LLVMBasicBlockRef bodyBlock = LLVMAppendBasicBlockInContext(phi_context, function, "bodyEntry");
@@ -235,100 +176,120 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	LLVMGetParams(function, args);
 	for (int i = paramCount-1; i >= 0; i--)
 	{
+		LLVMTypeRef argType = getAppropriateType((pe->inArgs)->misc);
 		char *name = pop(&(pe->inArgs));
 		LLVMValueRef v = args[i];
 		LLVMSetValueName2(v, name, strlen(name));
-		LLVMValueRef alloca = CreateEntryPointAlloca(function, name);
+		LLVMValueRef alloca = CreateEntryPointAlloca(function, argType, name);
 		LLVMBuildStore(phi_builder, v, alloca);
-		namesInScope = push(alloca, 1, namesInScope);
+		namesInScope = push(alloca, scope, namesInScope);
 		free(name);
 	}
 
-	LLVMValueRef body = codegen(fe->body);
+	LLVMValueRef body = codegen(fe->body, 0);
 	if (body == NULL)
 	{
 		LLVMDeleteFunction(function);
 		return NULL;
 	}
 	LLVMBuildRet(phi_builder, body);
-	LLVMVerifyFunction(function, LLVMPrintMessageAction);
+	int verified = LLVMVerifyFunction(function, LLVMPrintMessageAction);
+	if (verified == 1)
+	{
+		LLVMDeleteFunction(function);
+		return NULL;
+	}
 	LLVMRunFunctionPassManager(phi_passManager, function);
-
-	/* Remove local variables from the scope.
-	 * Note: These are precisely the first paramCount items on the stack */
-	clearStack(namesInScope, NULL);
-	namesInScope = NULL;
 	return function;
 }
 
 LLVMValueRef codegenCommandExpr (CommandExpr *ce)
 {
-	Expr *last = ce->es[1];
-	if (last->expr_type != expr_ident)
-		logError("A Command must end with a function call or an assignment.", 0x2501);
-	IdentExpr *ie = last->expr;
+	Expr *tail = ce->tail;
+	if (tail->expr_type != expr_ident)
+		return logError("A Command must end with a function call or an assignment.", 0x2701);
+	IdentExpr *ie = tail->expr;
 
-	/* First, see if the identifier should be a new Variable. If so, push it on the stack. */
+	/* First, see if the identifier should be a new Variable. If so, create it and push it on the stack. */
 	if (ie->flag == id_new)
 	{
-		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, ie->name);
-		namesInScope = push(alloca, 1, namesInScope);
+		LLVMValueRef incomingValue = codegen(ce->head, 0);
+		if (incomingValue == NULL)
+			return NULL;
+		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(incomingValue), ie->name);
+		LLVMBuildStore(phi_builder, incomingValue, alloca);
+		namesInScope = push(alloca, scope, namesInScope);
+		return incomingValue;
 	}
-	LLVMValueRef variable = NULL;
-	size_t len = strlen(ie->name);
-	stack *running = namesInScope;
 
-	/* Now test if we only want a function, and if not then query the variable stack.
-	 * If after this loop, we did not return, but a variable was requested, then abort. */
-	if (ie->flag == id_func)
-		running = NULL;
-	while (running != NULL)
+	/* Now test for an existing variable. */
+	if (ie->flag == id_var || ie->flag == id_any)
 	{
-		variable = running->item;
-		const char *name = LLVMGetValueName(variable);
-		if (strncmp(name, ie->name, len) == 0)
+		LLVMValueRef variable = NULL;
+		size_t len = strlen(ie->name);
+		stack *running = namesInScope;
+		while (running != NULL)
 		{
-			LLVMValueRef value = codegen(ce->es[0]);
-			LLVMBuildStore(phi_builder, value, variable);
-			return value;
+			variable = running->item;
+			const char *name = LLVMGetValueName(variable);
+			if (strncmp(name, ie->name, len) == 0)
+			{
+				LLVMValueRef value = codegen(ce->head, 0);
+				if (value == NULL)
+					return NULL;
+				LLVMBuildStore(phi_builder, value, variable);
+				return value;
+			}
+			running = running->next;
 		}
-		running = running->next;
+		if (ie->flag == id_var)
+			return logError("Found explicit Variable request with unknown identifier name!", 0x2702);
 	}
-	if (ie->flag == id_var)
-		return logError("Found explicit Variable request with unknown identifier name!", 0x2502);
 
 	/* If the previous code did not execute, see if the identifier is a function. If so, call it.
 	 * The Code will only ever get to this point, if a function is allowed or demanded. */
 	LLVMValueRef func = LLVMGetNamedFunction(phi_module, ie->name);
 	if (func == NULL)
-		return logError("Unrecognized identifier at end of Command.", 0x2503);
+		return logError("Unrecognized identifier at end of Command.", 0x2703);
 	unsigned expectedArgs = LLVMCountParams(func);
-	if (expectedArgs != breadth(ce->es[0]))
-		return logError("Incorrect number of arguments given to function!", 0x2503);
+	if (expectedArgs != breadth(ce->head))
+		return logError("Incorrect number of arguments given to function!", 0x2704);
 
 	/* Iteratively create the code for each argument */
-	Expr *args = ce->es[0];
+	Expr *args = ce->head;
 	LLVMValueRef argValues[expectedArgs];
 	for (unsigned i = expectedArgs-1; i >= 1; i--)
 	{
 		CommandExpr *ce = args->expr;
-		argValues[i] = codegen(ce->es[1]);
-		args = ce->es[0];
+		argValues[i] = codegen(ce->tail, 0);
+		if (argValues[i] == NULL)
+			return NULL;
+		args = ce->head;
 	}
-	argValues[0] = codegen(args);
+	argValues[0] = codegen(args, 0);
+	if (argValues == NULL)
+		return NULL;
 
 	return LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
 }
 
 LLVMValueRef codegenCondExpr (CondExpr *ce)
 {
-	LLVMValueRef cond = codegen(ce->Cond);
+	LLVMValueRef cond = codegen(ce->Cond, 0);
 	if (cond == NULL)
 		return NULL;
 
-	LLVMTypeRef retType = LLVMDoubleTypeInContext(phi_context);
-	LLVMValueRef zero = LLVMConstReal(retType, 0.0);
-	LLVMValueRef isTrue = LLVMBuildFCmp(phi_builder, LLVMRealONE, cond, zero, "ifcond");
+	LLVMTypeRef booltype = LLVMInt1TypeInContext(phi_context);
+	LLVMTypeRef condtype = LLVMTypeOf(cond);
+	if (condtype != booltype)
+	{
+		LLVMTypeKind condkind = LLVMGetTypeKind(condtype);
+		LLVMValueRef zero = LLVMConstNull(condtype);
+		if (condkind == LLVMDoubleTypeKind)
+			cond = LLVMBuildFCmp(phi_builder, LLVMRealONE, cond, zero, "ifcond");
+		else
+			return logError("Incompatible Type in conditional expression.", 0x2801);
+	}
 
 	/* Obtain the current function being built */
 	LLVMBasicBlockRef curBlock = LLVMGetInsertBlock(phi_builder);
@@ -338,29 +299,34 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	LLVMBasicBlockRef TrueBlock = LLVMAppendBasicBlockInContext(phi_context, fn, "TrueBlock");
 	LLVMBasicBlockRef FalseBlock = LLVMCreateBasicBlockInContext(phi_context, "FalseBlock");
 	LLVMBasicBlockRef MergeBlock = LLVMCreateBasicBlockInContext(phi_context, "MergeBlock");
-	LLVMBuildCondBr(phi_builder, isTrue, TrueBlock, FalseBlock);
+	LLVMBuildCondBr(phi_builder, cond, TrueBlock, FalseBlock);
 
 	/* Build the TrueBock */
 	LLVMPositionBuilderAtEnd(phi_builder, TrueBlock);
-	LLVMValueRef trueVal = codegen(ce->True);
+	LLVMValueRef trueVal = codegen(ce->True, 1);
 	if (trueVal == NULL)
 		return NULL;
 	LLVMBuildBr(phi_builder, MergeBlock);
+	LLVMTypeRef truetype = LLVMTypeOf(trueVal);
 	TrueBlock = LLVMGetInsertBlock(phi_builder);
 
 	/* Build the FalseBlock */
 	LLVMAppendExistingBasicBlock(fn, FalseBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, FalseBlock);
-	LLVMValueRef falseVal = codegen(ce->False);
+	LLVMValueRef falseVal = codegen(ce->False, 1);
 	if (falseVal == NULL)
 		return NULL;
 	LLVMBuildBr(phi_builder, MergeBlock);
+	LLVMTypeRef falsetype = LLVMTypeOf(falseVal);
 	FalseBlock = LLVMGetInsertBlock(phi_builder);
+
+	if (truetype != falsetype)
+		return logError("Incompatible types found in Conditional Blocks.", 0x2802);
 
 	/* Reunite the branches */
 	LLVMAppendExistingBasicBlock(fn, MergeBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, MergeBlock);
-	LLVMValueRef phiNode = LLVMBuildPhi(phi_builder, retType, "ifPhi");
+	LLVMValueRef phiNode = LLVMBuildPhi(phi_builder, truetype, "ifPhi");
 	LLVMValueRef incomingVals[2] = {trueVal, falseVal};
 	LLVMBasicBlockRef incomingBlocks[2] = {TrueBlock, FalseBlock};
 	LLVMAddIncoming(phiNode, incomingVals, incomingBlocks, 2);
@@ -368,28 +334,41 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	return phiNode;
 }
 
-LLVMValueRef codegen (Expr *e)
+LLVMValueRef codegen (Expr *e, int newScope)
 {
 	if (e == NULL)
 		return NULL;
+	scope += (newScope != 0);
+	LLVMValueRef val = NULL;
 	switch (e->expr_type)
 	{
-		case expr_number:
-			return codegenNumExpr(e->expr);
+		case expr_literal:
+			val = codegenLiteralExpr(e->expr);
+			break;
 		case expr_binop:
-			return codegenBinaryExpr(e->expr);
+			val = codegenBinaryExpr(e->expr);
+			break;
 		case expr_ident:
-			return codegenIdentExpr(e->expr);
+			val = codegenIdentExpr(e->expr);
+			break;
 		case expr_comm:
-			return codegenCommandExpr(e->expr);
+			val = codegenCommandExpr(e->expr);
+			break;
 		case expr_proto:
-			return codegenProtoExpr(e->expr);
+			val = codegenProtoExpr(e->expr);
+			break;
 		case expr_func:
-			return codegenFuncExpr(e->expr);
+			val = codegenFuncExpr(e->expr);
+			break;
 		case expr_conditional:
-			return codegenCondExpr(e->expr);
+			val = codegenCondExpr(e->expr);
+			break;
 		default:
-			logError("Cannot generate IR for unrecognized expression type!", 0x2000);
+			val = logError("Cannot generate IR for unrecognized expression type!", 0x2101);
+			break;
 	}
-	return NULL;
+	scope -= (newScope != 0);
+	while (namesInScope != NULL && namesInScope->misc > scope)
+		pop(&namesInScope);
+	return val;
 }

@@ -8,7 +8,7 @@ unsigned breadth (Expr *e)
 	{
 		br++;
 		CommandExpr *ce = e->expr;
-		e = ce->es[0];
+		e = ce->head;
 	}
 	return br+1;
 }
@@ -26,18 +26,19 @@ Expr* newExpression (int expr_type)
 	return e;
 }
 
-Expr* newNumberExpr (double val)
+Expr* newLiteralExpr (double val, int type)
 {
-	Expr *e = newExpression(expr_number);
+	Expr *e = newExpression(expr_literal);
 	if (e == NULL)
 		return NULL;
-	NumExpr *ne = malloc(sizeof(NumExpr));
+	LiteralExpr *ne = malloc(sizeof(LiteralExpr));
 	if (ne == NULL)
 	{
 		free(e);
 		return logError("Could not allocate Memory.", 0x101);
 	}
 	ne->val = val;
+	ne->type = type;
 	e->expr = ne;
 	return e;
 }
@@ -123,8 +124,8 @@ Expr* newCommandExpr (Expr *e1, Expr *e2)
 		free(e);
 		return logError("Could not allocate Memory.", 0x106);
 	}
-	ce->es[0] = e1;
-	ce->es[1] = e2;
+	ce->head = e1;
+	ce->tail = e2;
 	e->expr = ce;
 	return e;
 }
@@ -187,8 +188,8 @@ void clearCommandExpr (CommandExpr *ce)
 {
 	if (ce == NULL)
 		return;
-	clearExpr(ce->es[0]);
-	clearExpr(ce->es[1]);
+	clearExpr(ce->head);
+	clearExpr(ce->tail);
 }
 
 void clearCondExpr (CondExpr *ce)

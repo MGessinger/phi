@@ -13,13 +13,19 @@ enum IdentifierFlags
 
 enum Expressions
 {
-	expr_number,
+	expr_literal,
 	expr_binop,
 	expr_ident,
 	expr_proto,
 	expr_func,
 	expr_comm,
 	expr_conditional
+};
+
+enum Literals
+{
+	lit_number,
+	lit_bool
 };
 
 /* General Expression type */
@@ -29,9 +35,10 @@ typedef struct Expr {
 } Expr;
 
 /* Specific Expression types */
-typedef struct NumExprAST {
+typedef struct LiteralExprAST {
 	double val;
-} NumExpr;
+	int type;
+} LiteralExpr;
 
 typedef struct BinaryExprAST {
 	int op;
@@ -44,7 +51,8 @@ typedef struct IdentExprAST {
 } IdentExpr;
 
 typedef struct CommandExprAST {
-	Expr *es[2];
+	Expr *head;
+	Expr *tail;
 } CommandExpr;
 
 typedef struct ProtoExprAST {
@@ -64,7 +72,7 @@ typedef struct CondExprAST {
 	Expr *False;
 } CondExpr;
 
-Expr* newNumberExpr (double val);
+Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name, int flag);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
