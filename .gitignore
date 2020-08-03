@@ -1,3 +1,4 @@
 *.o
+build/
 parser.h
 *phi
