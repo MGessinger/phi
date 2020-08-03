@@ -102,3 +102,27 @@ LLVMValueRef buildAppropriateEq (LLVMValueRef lhs, LLVMValueRef rhs)
 	}
 	return logError("Incompatible types for binary '='.", 0x2543);
 }
+
+LLVMValueRef buildAppropriateMod (LLVMValueRef lhs, LLVMValueRef rhs)
+{
+	LLVMTypeRef lhstype = LLVMTypeOf(lhs);
+	LLVMTypeRef rhstype = LLVMTypeOf(rhs);
+	LLVMTypeKind lhskind = LLVMGetTypeKind(lhstype);
+	LLVMTypeKind rhskind = LLVMGetTypeKind(rhstype);
+
+	LLVMValueRef zero = LLVMConstNull(rhstype);
+	LLVMValueRef naive;
+
+	if (lhskind != rhskind)
+		return logError("No modulo available for variables of different type.", 0x2551);
+
+	if (lhskind == LLVMDoubleTypeKind)
+		naive = LLVMBuildFRem(phi_builder, lhs, rhs, "naiveFRem");
+	else if (lhskind == LLVMIntegerTypeKind)
+		naive = LLVMBuildSRem(phi_builder, lhs, rhs, "naiveSRem");
+	else
+		return logError("Incompatible types for binary '%'.", 0x2552);
+	LLVMValueRef isZero = buildAppropriateEq(rhs, zero);
+
+	return LLVMBuildSelect(phi_builder, isZero, naive, lhs, "remSelect");
+}

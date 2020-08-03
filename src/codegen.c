@@ -124,6 +124,8 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 			return buildAppropriateCmp(l, r);
 		case '=':
 			return buildAppropriateEq(l, r);
+		case '%':
+			return buildAppropriateMod(l, r);
 		default:
 			return logError("Unrecognized binary operator!", 0x2501);
 	}

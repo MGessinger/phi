@@ -29,6 +29,7 @@
 %nonassoc '<' '>'
 
 %left '+' '-'
+%left '%'
 %left '*' '/'
 %{
 	int yylex();
@@ -86,6 +87,7 @@ BINARYOP : EXPRESSION '+' EXPRESSION	{ $$ = newBinaryExpr('+', $1, $3); }
 	 | EXPRESSION '<' EXPRESSION	{ $$ = newBinaryExpr('<', $1, $3); }
 	 | EXPRESSION '>' EXPRESSION	{ $$ = newBinaryExpr('<', $3, $1); } /* Switched the Arguments! */
 	 | EXPRESSION '=' EXPRESSION	{ $$ = newBinaryExpr('=', $1, $3); }
+	 | EXPRESSION '%' EXPRESSION	{ $$ = newBinaryExpr('%', $1, $3); }
 	 ;
 
 PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
@@ -98,9 +100,9 @@ PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
 	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1100); }
 	;
 
-OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' ;
+OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' | '%' ;
 
-MALFORMED : EXPRESSION OP error 	{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1500); }
+MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1500); }
 	  ;
 
 /*=================================================*/
