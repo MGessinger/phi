@@ -172,7 +172,6 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	LLVMValueRef l = codegen(be->LHS, 0);
 	clearStack(&valueStack, NULL);
 	LLVMValueRef r = codegen(be->RHS, 0);
-	clearStack(&valueStack, NULL);
 	if (l == NULL || r == NULL)
 		return NULL;
 
@@ -184,8 +183,14 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	switch (be->op)
 	{
 		case ':':
-			val = r;
-			break;
+			while (valueStack != NULL)
+			{
+				int misc = valueStack->misc;
+				void *val = pop(&valueStack);
+				globalValueStack = push(val, misc, globalValueStack);
+			}
+			valueStack = globalValueStack;
+			return r;
 		case '+':
 			val = buildAppropriateAddition(l, r);
 			break;
@@ -216,6 +221,7 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 		default:
 			return logError("Unrecognized binary operator!", 0x2501);
 	}
+	clearStack(&valueStack, NULL);
 	valueStack = push(val, 0, globalValueStack);
 	return val;
 }
