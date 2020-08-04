@@ -19,6 +19,8 @@ extern			return keyword_extern;
 just			return keyword_just;
 if			return keyword_if;
 else			return keyword_else;
+end			return keyword_end;
+while			return keyword_while;
 
 Bool			return type_bool;
 Real			return type_real;

@@ -148,6 +148,24 @@ Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False)
 	return e;
 }
 
+Expr* newLoopExpr (Expr *Cond, Expr *Body, Expr *Else)
+{
+	Expr *e = newExpression(expr_loop);
+	if (e == NULL)
+		return NULL;
+	LoopExpr *le = malloc(sizeof(LoopExpr));
+	if (le == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x107);
+	}
+	le->Cond = Cond;
+	le->Body = Body;
+	le->Else = Else;
+	e->expr = le;
+	return e;
+}
+
 /*----------------------*\
  *	Clear Data	*
 \*----------------------*/
@@ -201,6 +219,15 @@ void clearCondExpr (CondExpr *ce)
 	clearExpr(ce->False);
 }
 
+void clearLoopExpr (LoopExpr *le)
+{
+	if (le == NULL)
+		return;
+	clearExpr(le->Cond);
+	clearExpr(le->Body);
+	clearExpr(le->Else);
+}
+
 void clearExpr (Expr *e)
 {
 	if (e == NULL)
@@ -224,6 +251,9 @@ void clearExpr (Expr *e)
 			break;
 		case expr_conditional:
 			clearCondExpr(e->expr);
+			break;
+		case expr_loop:
+			clearLoopExpr(e->expr);
 			break;
 		default:
 			break;

@@ -19,7 +19,8 @@ enum Expressions
 	expr_proto,
 	expr_func,
 	expr_comm,
-	expr_conditional
+	expr_conditional,
+	expr_loop
 };
 
 enum Literals
@@ -72,6 +73,12 @@ typedef struct CondExprAST {
 	Expr *False;
 } CondExpr;
 
+typedef struct LoopExprAST {
+	Expr *Cond;
+	Expr *Body;
+	Expr *Else;
+} LoopExpr;
+
 Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name, int flag);
@@ -79,6 +86,7 @@ Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 Expr* newCommandExpr (Expr *e1, Expr *e2);
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
+Expr* newLoopExpr (Expr *Cond, Expr *body, Expr *Else);
 
 void* logError (const char *msg, int code);
 void clearExpr (Expr *e);

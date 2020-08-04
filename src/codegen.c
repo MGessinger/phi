@@ -355,13 +355,13 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	}
 
 	/* Obtain the current function being built */
-	LLVMBasicBlockRef curBlock = LLVMGetInsertBlock(phi_builder);
-	LLVMValueRef fn = LLVMGetBasicBlockParent(curBlock);
+	LLVMBasicBlockRef PreviousBlock = LLVMGetInsertBlock(phi_builder);
+	LLVMValueRef fn = LLVMGetBasicBlockParent(PreviousBlock);
 
 	/* Create new Blocks for True, False and the Merge */
 	LLVMBasicBlockRef TrueBlock = LLVMAppendBasicBlockInContext(phi_context, fn, "TrueBlock");
 	LLVMBasicBlockRef FalseBlock = LLVMCreateBasicBlockInContext(phi_context, "FalseBlock");
-	LLVMBasicBlockRef MergeBlock = LLVMCreateBasicBlockInContext(phi_context, "MergeBlock");
+	LLVMBasicBlockRef MergeBlock = LLVMCreateBasicBlockInContext(phi_context, "AfterIf");
 	LLVMBuildCondBr(phi_builder, cond, TrueBlock, FalseBlock);
 
 	/* Build the TrueBlock */
@@ -371,33 +371,91 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	if (trueVal == NULL)
 		return NULL;
 	LLVMBuildBr(phi_builder, MergeBlock);
-	LLVMTypeRef truetype = LLVMTypeOf(trueVal);
-	TrueBlock = LLVMGetInsertBlock(phi_builder);
 
 	/* Build the FalseBlock */
 	clearStack(&valueStack, NULL);
 	LLVMAppendExistingBasicBlock(fn, FalseBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, FalseBlock);
-	LLVMValueRef falseVal = codegen(ce->False, 1);
-	if (falseVal == NULL)
-		return NULL;
+	if (ce->False != NULL)
+	{
+		LLVMValueRef falseVal = codegen(ce->False, 1);
+		if (falseVal == NULL)
+			return NULL;
+	}
 	LLVMBuildBr(phi_builder, MergeBlock);
-	LLVMTypeRef falsetype = LLVMTypeOf(falseVal);
-	FalseBlock = LLVMGetInsertBlock(phi_builder);
-
-	if (truetype != falsetype)
-		return logError("Incompatible types found in Conditional Blocks.", 0x2702);
 
 	/* Reunite the branches */
 	clearStack(&valueStack, NULL);
 	LLVMAppendExistingBasicBlock(fn, MergeBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, MergeBlock);
-	LLVMValueRef phiNode = LLVMBuildPhi(phi_builder, truetype, "ifPhi");
-	LLVMValueRef incomingVals[2] = {trueVal, falseVal};
-	LLVMBasicBlockRef incomingBlocks[2] = {TrueBlock, FalseBlock};
-	LLVMAddIncoming(phiNode, incomingVals, incomingBlocks, 2);
 
-	return phiNode;
+	LLVMTypeRef voidType = LLVMVoidTypeInContext(phi_context);
+	LLVMValueRef voidVal = LLVMGetUndef(voidType);
+	return voidVal;
+}
+
+LLVMValueRef codegenLoopExpr (LoopExpr *le)
+{
+	LLVMValueRef cond = codegen(le->Cond, 0);
+	if (cond == NULL)
+		return NULL;
+
+	LLVMTypeRef booltype = LLVMInt1TypeInContext(phi_context);
+	LLVMTypeRef condtype = LLVMTypeOf(cond);
+	LLVMValueRef zero = NULL;
+	if (condtype != booltype)
+	{
+		LLVMTypeKind condkind = LLVMGetTypeKind(condtype);
+		zero = LLVMConstNull(condtype);
+		if (condkind == LLVMDoubleTypeKind)
+			cond = LLVMBuildFCmp(phi_builder, LLVMRealONE, cond, zero, "loopcond");
+		else
+			return logError("Incompatible Type in conditional expression.", 0x2701);
+	}
+
+	/* Obtain the current function being built */
+	LLVMBasicBlockRef PreviousBlock = LLVMGetInsertBlock(phi_builder);
+	LLVMValueRef fn = LLVMGetBasicBlockParent(PreviousBlock);
+
+	/* Create new Blocks for Body, Else and the Merge */
+	LLVMBasicBlockRef BodyBlock = LLVMAppendBasicBlockInContext(phi_context, fn, "LoopBody");
+	LLVMBasicBlockRef ElseBlock = LLVMCreateBasicBlockInContext(phi_context, "ElseBlock");
+	LLVMBasicBlockRef MergeBlock = LLVMCreateBasicBlockInContext(phi_context, "AfterLoop");
+	LLVMBuildCondBr(phi_builder, cond, BodyBlock, ElseBlock);
+
+	/* Build the Loop Body */
+	clearStack(&valueStack, NULL);
+	LLVMPositionBuilderAtEnd(phi_builder, BodyBlock);
+	LLVMValueRef bodyVal = codegen(le->Body, 1);
+	if (bodyVal == NULL)
+		return NULL;
+
+	/* Rebuild the condition at the end of the Loop Body */
+	cond = codegen(le->Cond, 0);
+	if (zero != NULL)
+		LLVMBuildFCmp(phi_builder, LLVMRealONE, cond, zero, "loopcond");
+	LLVMBuildCondBr(phi_builder, cond, BodyBlock, MergeBlock);
+
+	/* Build the Else Block */
+	clearStack(&valueStack, NULL);
+	LLVMAppendExistingBasicBlock(fn, ElseBlock);
+	LLVMPositionBuilderAtEnd(phi_builder, ElseBlock);
+	if (le->Else != NULL)
+	{
+		LLVMValueRef falseVal = codegen(le->Else, 1);
+		if (falseVal == NULL)
+			return NULL;
+	}
+	LLVMBuildBr(phi_builder, MergeBlock);
+
+	/* Reunite Branches */
+	clearStack(&valueStack, NULL);
+	LLVMAppendExistingBasicBlock(fn, MergeBlock);
+	LLVMPositionBuilderAtEnd(phi_builder, MergeBlock);
+
+	LLVMTypeRef voidType = LLVMVoidTypeInContext(phi_context);
+	LLVMValueRef voidVal = LLVMGetUndef(voidType);
+	return voidVal;
 }
 
 LLVMValueRef codegen (Expr *e, int newScope)
@@ -425,6 +483,9 @@ LLVMValueRef codegen (Expr *e, int newScope)
 			break;
 		case expr_conditional:
 			val = codegenCondExpr(e->expr);
+			break;
+		case expr_loop:
+			val = codegenLoopExpr(e->expr);
 			break;
 		case expr_comm:
 		{
