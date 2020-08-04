@@ -1,6 +1,5 @@
 %{
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "ast.h"
 #include "stack.h"
@@ -12,7 +11,7 @@
 	char *string;
 	void *pointer;
 }
-%token keyword_new keyword_extern keyword_just
+%token keyword_new keyword_extern
 %token keyword_if keyword_else keyword_while keyword_end
 %token <string>		tok_ident tok_new tok_var tok_func
 %token <numerical>	tok_number tok_bool tok_arr
@@ -42,17 +41,11 @@ INPUT :
       | INPUT TOPLEVEL			{ codegen($2, 1); clearExpr($2); }
       ;
 
-TOPLEVEL : TOPLEVEL ';'			{ $$ = $1; }
-	 | error			{ $$ = NULL; }
+TOPLEVEL : error			{ $$ = NULL; }
 	 | keyword_extern		{ needsName = 0; }
-		DECLARATION		{ printf("Parsed external declaration\n");	$$ = $3; }
+		DECLARATION		{ $$ = $3; }
 	 | keyword_new			{ needsName = 1; }
-		DEFINITION		{ printf("Parsed function definition\n");	$$ = $3; }
-	 | keyword_just QUEUE		{ printf("Parsed top-level command\n");
-					  char *name = malloc(sizeof(char));
-					  name[0] = '\0';
-					  Expr *anon = newProtoExpr (name, NULL, NULL);
-					  $$ = newFunctionExpr(anon, $2); }
+		DEFINITION		{ $$ = $3; }
 	 ;
 
 /*===========================================*\
@@ -76,7 +69,7 @@ IFBLOCK : keyword_if EXPRESSION MINIMAL keyword_else MINIMAL	{ $$ = newCondExpr(
 	| keyword_if EXPRESSION MINIMAL keyword_end		{ $$ = newCondExpr($2, $3, NULL); }
 	| keyword_if EXPRESSION MINIMAL error			{ clearExpr($2); clearExpr($3); ERROR("Expected \"end\" or \"else\" after Conditional Expression.", 0x1303); }
 	| keyword_if EXPRESSION error				{ clearExpr($2); ERROR("Expected Command in Conditional statement.", 0x1302); }
-	| keyword_if error					{ ERROR("Expected Conditional Expression after \"if\".", 0x1303); }
+	| keyword_if error					{ ERROR("Expected Conditional Expression after \"if\".", 0x1301); }
 	;
 
 LOOPEXP : keyword_while EXPRESSION MINIMAL keyword_else MINIMAL	{ $$ = newLoopExpr($2, $3, $5); }

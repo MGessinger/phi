@@ -3,15 +3,15 @@
 
 #include "stack.h"
 
-enum IdentifierFlags
+typedef enum IdentifierFlags
 {
 	id_any,
 	id_var,
 	id_func,
 	id_new
-};
+} IdFlag;
 
-enum Expressions
+typedef enum Expressions
 {
 	expr_literal,
 	expr_binop,
@@ -21,7 +21,7 @@ enum Expressions
 	expr_comm,
 	expr_conditional,
 	expr_loop
-};
+} ExprType;
 
 enum Literals
 {
@@ -31,7 +31,7 @@ enum Literals
 
 /* General Expression type */
 typedef struct Expr {
-	int expr_type;
+	ExprType expr_type;
 	void *expr;
 } Expr;
 
@@ -48,7 +48,7 @@ typedef struct BinaryExprAST {
 
 typedef struct IdentExprAST {
 	char *name;
-	int flag;
+	IdFlag flag;
 } IdentExpr;
 
 typedef struct CommandExprAST {
@@ -81,7 +81,7 @@ typedef struct LoopExprAST {
 
 Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
-Expr* newIdentExpr (char *name, int flag);
+Expr* newIdentExpr (char *name, IdFlag flag);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 Expr* newCommandExpr (Expr *e1, Expr *e2);
@@ -90,7 +90,5 @@ Expr* newLoopExpr (Expr *Cond, Expr *body, Expr *Else);
 
 void* logError (const char *msg, int code);
 void clearExpr (Expr *e);
-
-unsigned breadth (Expr *e);
 
 #endif /* AST_H_ */

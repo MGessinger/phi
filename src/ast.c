@@ -1,23 +1,11 @@
 #include <stdlib.h>
 #include "ast.h"
 
-unsigned breadth (Expr *e)
-{
-	unsigned br = 0;
-	while (e->expr_type == expr_comm)
-	{
-		br++;
-		CommandExpr *ce = e->expr;
-		e = ce->head;
-	}
-	return br+1;
-}
-
 /*-------------*\
  * Create Data *
 \*-------------*/
 
-Expr* newExpression (int expr_type)
+Expr* newExpression (ExprType expr_type)
 {
 	Expr *e = malloc(sizeof(Expr));
 	if (e == NULL)
@@ -61,7 +49,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	return e;
 }
 
-Expr* newIdentExpr (char *name, int flag)
+Expr* newIdentExpr (char *name, IdFlag flag)
 {
 	Expr *e = newExpression(expr_ident);
 	if (e == NULL)

@@ -5,10 +5,11 @@
 char *copyString (const char *str, unsigned cutoff);
 %}
 %x COMMENT
+%s IDENTIFIER
 IDENT [a-zA-Z_][a-zA-Z0-9_]*
 %%
-"/*"			{ BEGIN(COMMENT); }
-<COMMENT>"*/"		{ BEGIN(INITIAL); }
+"/*"			BEGIN(COMMENT);
+<COMMENT>"*/"		BEGIN(INITIAL);
 <COMMENT>\n		|
 <COMMENT>.		|
 "//".*			|
@@ -16,7 +17,6 @@ IDENT [a-zA-Z_][a-zA-Z0-9_]*
 
 new			return keyword_new;
 extern			return keyword_extern;
-just			return keyword_just;
 if			return keyword_if;
 else			return keyword_else;
 end			return keyword_end;
