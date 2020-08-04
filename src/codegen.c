@@ -74,7 +74,7 @@ LLVMValueRef codegenCallExpr (IdentExpr *ie)
 		return NULL;
 	unsigned expectedArgs = LLVMCountParams(func);
 	if (expectedArgs > depth(valueStack))
-		return logError("Insufficient number of arguments given to function!", 0x2403);
+		return logError("Insufficient number of arguments given to function!", 0x2404);
 
 	/* Iteratively create the code for each argument */
 	LLVMValueRef argValues[expectedArgs];
@@ -106,11 +106,24 @@ LLVMValueRef codegenCallExpr (IdentExpr *ie)
 
 LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 {
-	/* First, see if the identifier should be a new Variable. If so, create it and push it on the stack. */
+	/* First, test for known keywords */
+	if (strncmp(ie->name, "store", 6) == 0)
+	{
+		if (valueStack == NULL)
+			return logError("No values found to be stored in variables.", 0x2401);
+		stack *runner = valueStack;
+		while (runner != NULL)
+		{
+			runner->misc = 1;
+			runner = runner->next;
+		}
+		return valueStack->item;
+	}
+	/* Now see if the identifier should be a new Variable. If so, create it and push it on the stack. */
 	if (ie->flag == id_new)
 	{
 		if (valueStack == NULL)
-			return logError("Cannot assign variable without value.", 0x2401);
+			return logError("Cannot assign variable without value.", 0x2402);
 		LLVMValueRef value = pop(&valueStack);
 		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(value), ie->name);
 		LLVMBuildStore(phi_builder, value, alloca);
@@ -144,12 +157,12 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 			}
 		}
 		if (ie->flag == id_var)
-			return logError("Found explicit Variable request with unknown identifier name!", 0x2402);
+			return logError("Found explicit Variable request with unknown identifier name!", 0x2403);
 	}
 	LLVMValueRef tryFunction = codegenCallExpr(ie);
 	if (tryFunction != NULL)
 		return tryFunction;
-	return logError("Unrecognized identifier!", 0x2403);
+	return logError("Unrecognized identifier!", 0x2405);
 }
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
