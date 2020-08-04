@@ -23,8 +23,9 @@ void* pop (stack **head)
 	return oldItem;
 }
 
-void clearStack (stack *head, void (*clear)(void*))
+void clearStack (stack **orighead, void (*clear)(void*))
 {
+	stack *head = *orighead;
 	stack *nextHead;
 	while (head != NULL) {
 		nextHead = head->next;
@@ -33,6 +34,7 @@ void clearStack (stack *head, void (*clear)(void*))
 		free(head);
 		head = nextHead;
 	}
+	*orighead = NULL;
 }
 
 unsigned depth (stack *head)

@@ -15,6 +15,7 @@ LLVMModuleRef phi_module;
 LLVMBuilderRef phi_builder, alloca_builder;
 extern LLVMPassManagerRef phi_passManager;
 
+static stack *valueStack = NULL;
 static stack *namesInScope = NULL;
 static int scope = 0;
 
@@ -27,7 +28,7 @@ LLVMTypeRef getAppropriateType (int typename)
 		case type_bool:
 			return LLVMInt1TypeInContext(phi_context);
 		default:
-			return logError("Unknown Type Name!", 0x2301);
+			return logError("Unknown Type Name!", 0x2101);
 	}
 	return NULL;
 }
@@ -40,7 +41,7 @@ LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, LLVMTypeRef varType, con
 	else
 		entryBlock = LLVMGetEntryBasicBlock(func);
 	if (entryBlock == NULL)
-		return logError("Attempting to Create Variable in empty function!", 0x2202);
+		return logError("Attempting to Create Variable in empty function!", 0x2201);
 	LLVMPositionBuilderAtEnd(alloca_builder, entryBlock);
 	LLVMValueRef alloca = LLVMBuildAlloca(alloca_builder, varType, name);
 	return alloca;
@@ -50,53 +51,115 @@ LLVMValueRef codegenLiteralExpr (LiteralExpr *le)
 {
 	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
 	LLVMTypeRef boolType = LLVMInt1TypeInContext(phi_context);
+	LLVMValueRef val = NULL;
 	switch (le->type)
 	{
 		case lit_number:
-			return LLVMConstReal(doubleType, le->val);
+			val = LLVMConstReal(doubleType, le->val);
+			break;
 		case lit_bool:
-			return LLVMConstInt(boolType, (le->val)!=0, 0);
+			val = LLVMConstInt(boolType, (le->val)!=0, 0);
+			break;
 		default:
-			return logError("Unknown literal type.", 0x200);
+			return logError("Unknown literal type.", 0x2301);
 	}
-	return NULL;
+	valueStack = push(val, 0, valueStack);
+	return val;
+}
+
+LLVMValueRef codegenCallExpr (IdentExpr *ie)
+{
+	LLVMValueRef func = LLVMGetNamedFunction(phi_module, ie->name);
+	if (func == NULL)
+		return NULL;
+	unsigned expectedArgs = LLVMCountParams(func);
+	if (expectedArgs > depth(valueStack))
+		return logError("Insufficient number of arguments given to function!", 0x2403);
+
+	/* Iteratively create the code for each argument */
+	LLVMValueRef argValues[expectedArgs];
+	for (int i = expectedArgs-1; i >= 0; i--)
+	{
+		LLVMValueRef val = pop(&valueStack);
+		if (val == NULL)
+			return NULL;
+		argValues[i] = val;
+	}
+
+	LLVMValueRef result = LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
+	LLVMTypeRef returnType = LLVMTypeOf(result);
+	LLVMTypeKind returnKind = LLVMGetTypeKind(returnType);
+	/* If we only returned a single type, push and return that. */
+	if (returnKind != LLVMStructTypeKind)
+	{
+		valueStack = push(result, 1, valueStack);
+		return result;
+	}
+	unsigned numOfReturnTypes = LLVMCountStructElementTypes(returnType);
+	for (unsigned i = 0; i < numOfReturnTypes; i++)
+	{
+		LLVMValueRef structElement = LLVMBuildExtractValue(phi_builder, result, i, "structelem");
+		valueStack = push(structElement, 1, valueStack);
+	}
+	return result;
 }
 
 LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 {
-	const char *valName;
-	size_t length;
-	size_t inplen = strlen(ie->name);
-
-	stack *runner = namesInScope;
-	if (ie->flag != id_var && ie->flag != id_any)
-		runner = NULL;
-	while (runner != NULL)
+	/* First, see if the identifier should be a new Variable. If so, create it and push it on the stack. */
+	if (ie->flag == id_new)
 	{
-		LLVMValueRef v = runner->item;
-		valName = LLVMGetValueName2(v, &length);
-		if (strncmp(valName, ie->name, inplen) == 0)
-		{
-			LLVMValueRef load = LLVMBuildLoad(phi_builder, v, valName);
-			return load;
-		}
-		runner = runner->next;
+		if (valueStack == NULL)
+			return logError("Cannot assign variable without value.", 0x2401);
+		LLVMValueRef value = pop(&valueStack);
+		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(value), ie->name);
+		LLVMBuildStore(phi_builder, value, alloca);
+		namesInScope = push(alloca, scope, namesInScope);
+		return value;
 	}
 
-	LLVMValueRef func = NULL;
-	if (ie->flag == id_func || ie->flag == id_any)
-		func = LLVMGetNamedFunction(phi_module, ie->name);
-	if (func != NULL)
-		return LLVMBuildCall(phi_builder, func, NULL, 0, "calltmp");
-
-	return logError("Unrecognized identifier!", 0x2401);
+	/* Now test for an existing variable. */
+	if (ie->flag == id_var || ie->flag == id_any)
+	{
+		LLVMValueRef variableAlloca = NULL;
+		size_t len = strlen(ie->name);
+		for (stack *r = namesInScope; r != NULL; r = r->next)
+		{
+			variableAlloca = r->item;
+			const char *name = LLVMGetValueName(variableAlloca);
+			if (strncmp(name, ie->name, len) == 0)
+			{
+				if (ie->flag == id_var || valueStack == NULL || valueStack->misc == 0)
+				{
+					LLVMValueRef load = LLVMBuildLoad(phi_builder, variableAlloca, name);
+					valueStack = push(load, 0, valueStack);
+					return load;
+				}
+				else
+				{
+					LLVMValueRef value = pop(&valueStack);
+					LLVMBuildStore(phi_builder, value, variableAlloca);
+					return value;
+				}
+			}
+		}
+		if (ie->flag == id_var)
+			return logError("Found explicit Variable request with unknown identifier name!", 0x2402);
+	}
+	LLVMValueRef tryFunction = codegenCallExpr(ie);
+	if (tryFunction != NULL)
+		return tryFunction;
+	return logError("Unrecognized identifier!", 0x2403);
 }
-
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 {
+	stack *globalValueStack = valueStack;
+	valueStack = NULL;
 	LLVMValueRef l = codegen(be->LHS, 0);
+	clearStack(&valueStack, NULL);
 	LLVMValueRef r = codegen(be->RHS, 0);
+	clearStack(&valueStack, NULL);
 	if (l == NULL || r == NULL)
 		return NULL;
 
@@ -104,51 +167,75 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	LLVMTypeRef rhsType = LLVMTypeOf(r);
 
 	LLVMTypeRef doubletype = LLVMDoubleTypeInContext(phi_context);
+	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
 		case ':':
-			return r;
+			val = r;
+			break;
 		case '+':
-			return buildAppropriateAddition(l, r);
+			val = buildAppropriateAddition(l, r);
+			break;
 		case '-':
 			if (lhsType != doubletype || rhsType != doubletype)
-				return logError("Cannot subtract variables of type other than Real", 0x2502);
-			return LLVMBuildFSub(phi_builder, l, r, "subtmp");
+				val = logError("Cannot subtract variables of type other than Real", 0x2502);
+			else
+				val = LLVMBuildFSub(phi_builder, l, r, "subtmp");
+			break;
 		case '*':
-			return buildAppropriateMultiplication(l, r);
+			val = buildAppropriateMultiplication(l, r);
+			break;
 		case '/':
 			if (lhsType != doubletype || rhsType != doubletype)
-				return logError("Cannot subtract variables of type other than Real", 0x2502);
-			return LLVMBuildFDiv(phi_builder, l, r, "divtmp");
+				val = logError("Cannot divide variables of type other than Real", 0x2503);
+			else
+				val = LLVMBuildFDiv(phi_builder, l, r, "divtmp");
+			break;
 		case '<':
-			return buildAppropriateCmp(l, r);
+			val = buildAppropriateCmp(l, r);
+			break;
 		case '=':
-			return buildAppropriateEq(l, r);
+			val = buildAppropriateEq(l, r);
+			break;
 		case '%':
-			return buildAppropriateMod(l, r);
+			val = buildAppropriateMod(l, r);
+			break;
 		default:
 			return logError("Unrecognized binary operator!", 0x2501);
 	}
-	return NULL;
+	valueStack = push(val, 0, globalValueStack);
+	return val;
 }
 
 LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 {
 	int numOfInputArgs = depth(pe->inArgs);
+	int numOfOutputArgs = depth(pe->outArgs);
 	LLVMTypeRef args[numOfInputArgs];
 	stack *runner = pe->inArgs;
-	for (int i = 0; i < numOfInputArgs; i++)
+	for (int i = numOfInputArgs-1; i >= 0; i--)
 	{
 		args[i] = getAppropriateType(runner->misc);
 		runner = runner->next;
 	}
 
-	LLVMTypeRef ret;
-	if (pe->outArgs == NULL)
-		ret = LLVMVoidTypeInContext(phi_context);
+	LLVMTypeRef retType;
+	if (numOfOutputArgs == 0)
+		retType = LLVMVoidTypeInContext(phi_context);
+	else if (numOfOutputArgs == 1)
+		retType = getAppropriateType((pe->outArgs)->misc);
 	else
-		ret = getAppropriateType((pe->outArgs)->misc);
-	LLVMTypeRef funcType = LLVMFunctionType(ret, args, numOfInputArgs, 0);
+	{
+		LLVMTypeRef rettypes[numOfOutputArgs];
+		stack *runner = pe->outArgs;
+		for (int i = numOfOutputArgs-1; i >= 0; i--)
+		{
+			rettypes[i] = getAppropriateType(runner->misc);
+			runner = runner->next;
+		}
+		retType = LLVMStructTypeInContext(phi_context, rettypes, numOfOutputArgs, 0);
+	}
+	LLVMTypeRef funcType = LLVMFunctionType(retType, args, numOfInputArgs, 0);
 	return LLVMAddFunction(phi_module, pe->name, funcType);
 }
 
@@ -194,7 +281,32 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		LLVMDeleteFunction(function);
 		return NULL;
 	}
-	LLVMBuildRet(phi_builder, body);
+	LLVMTypeRef funcType = LLVMGetElementType(LLVMTypeOf(function));
+	LLVMTypeRef returnType = LLVMGetReturnType(funcType);
+	if (LLVMGetTypeKind(returnType) == LLVMStructTypeKind)
+	{
+		unsigned countOfRetValues = LLVMCountStructElementTypes(returnType);
+		if (valueStack == NULL || countOfRetValues < depth(valueStack))
+		{
+			LLVMDeleteFunction(function);
+			return logError("Not enough return values specified.", 0x2603);
+		}
+		LLVMValueRef retValues[countOfRetValues];
+		for (int i = countOfRetValues-1; i >= 0; i--)
+		{
+			retValues[i] = pop(&valueStack);
+			if (retValues[i] == NULL)
+			{
+				LLVMDeleteFunction(function);
+				return NULL;
+			}
+		}
+		LLVMBuildAggregateRet(phi_builder, retValues, countOfRetValues);
+	}
+	else if (valueStack != NULL)
+		LLVMBuildRet(phi_builder, pop(&valueStack));
+	else
+		LLVMBuildRet(phi_builder, body);
 	int verified = LLVMVerifyFunction(function, LLVMPrintMessageAction);
 	if (verified == 1)
 	{
@@ -203,76 +315,6 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	}
 	LLVMRunFunctionPassManager(phi_passManager, function);
 	return function;
-}
-
-LLVMValueRef codegenCommandExpr (CommandExpr *ce)
-{
-	Expr *tail = ce->tail;
-	if (tail->expr_type != expr_ident)
-		return logError("A Command must end with a function call or an assignment.", 0x2701);
-	IdentExpr *ie = tail->expr;
-
-	/* First, see if the identifier should be a new Variable. If so, create it and push it on the stack. */
-	if (ie->flag == id_new)
-	{
-		LLVMValueRef incomingValue = codegen(ce->head, 0);
-		if (incomingValue == NULL)
-			return NULL;
-		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(incomingValue), ie->name);
-		LLVMBuildStore(phi_builder, incomingValue, alloca);
-		namesInScope = push(alloca, scope, namesInScope);
-		return incomingValue;
-	}
-
-	/* Now test for an existing variable. */
-	if (ie->flag == id_var || ie->flag == id_any)
-	{
-		LLVMValueRef variable = NULL;
-		size_t len = strlen(ie->name);
-		stack *running = namesInScope;
-		while (running != NULL)
-		{
-			variable = running->item;
-			const char *name = LLVMGetValueName(variable);
-			if (strncmp(name, ie->name, len) == 0)
-			{
-				LLVMValueRef value = codegen(ce->head, 0);
-				if (value == NULL)
-					return NULL;
-				LLVMBuildStore(phi_builder, value, variable);
-				return value;
-			}
-			running = running->next;
-		}
-		if (ie->flag == id_var)
-			return logError("Found explicit Variable request with unknown identifier name!", 0x2702);
-	}
-
-	/* If the previous code did not execute, see if the identifier is a function. If so, call it.
-	 * The Code will only ever get to this point, if a function is allowed or demanded. */
-	LLVMValueRef func = LLVMGetNamedFunction(phi_module, ie->name);
-	if (func == NULL)
-		return logError("Unrecognized identifier at end of Command.", 0x2703);
-	unsigned expectedArgs = LLVMCountParams(func);
-	if (expectedArgs != breadth(ce->head))
-		return logError("Incorrect number of arguments given to function!", 0x2704);
-
-	/* Iteratively create the code for each argument */
-	Expr *args = ce->head;
-	LLVMValueRef argValues[expectedArgs];
-	for (unsigned i = expectedArgs-1; i >= 1; i--)
-	{
-		CommandExpr *ce = args->expr;
-		argValues[i] = codegen(ce->tail, 0);
-		if (argValues[i] == NULL)
-			return NULL;
-		args = ce->head;
-	}
-	argValues[0] = codegen(args, 0);
-	if (argValues == NULL)
-		return NULL;
-
-	return LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
 }
 
 LLVMValueRef codegenCondExpr (CondExpr *ce)
@@ -290,7 +332,7 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 		if (condkind == LLVMDoubleTypeKind)
 			cond = LLVMBuildFCmp(phi_builder, LLVMRealONE, cond, zero, "ifcond");
 		else
-			return logError("Incompatible Type in conditional expression.", 0x2801);
+			return logError("Incompatible Type in conditional expression.", 0x2701);
 	}
 
 	/* Obtain the current function being built */
@@ -303,7 +345,8 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	LLVMBasicBlockRef MergeBlock = LLVMCreateBasicBlockInContext(phi_context, "MergeBlock");
 	LLVMBuildCondBr(phi_builder, cond, TrueBlock, FalseBlock);
 
-	/* Build the TrueBock */
+	/* Build the TrueBlock */
+	clearStack(&valueStack, NULL);
 	LLVMPositionBuilderAtEnd(phi_builder, TrueBlock);
 	LLVMValueRef trueVal = codegen(ce->True, 1);
 	if (trueVal == NULL)
@@ -313,6 +356,7 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	TrueBlock = LLVMGetInsertBlock(phi_builder);
 
 	/* Build the FalseBlock */
+	clearStack(&valueStack, NULL);
 	LLVMAppendExistingBasicBlock(fn, FalseBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, FalseBlock);
 	LLVMValueRef falseVal = codegen(ce->False, 1);
@@ -323,9 +367,10 @@ LLVMValueRef codegenCondExpr (CondExpr *ce)
 	FalseBlock = LLVMGetInsertBlock(phi_builder);
 
 	if (truetype != falsetype)
-		return logError("Incompatible types found in Conditional Blocks.", 0x2802);
+		return logError("Incompatible types found in Conditional Blocks.", 0x2702);
 
 	/* Reunite the branches */
+	clearStack(&valueStack, NULL);
 	LLVMAppendExistingBasicBlock(fn, MergeBlock);
 	LLVMPositionBuilderAtEnd(phi_builder, MergeBlock);
 	LLVMValueRef phiNode = LLVMBuildPhi(phi_builder, truetype, "ifPhi");
@@ -353,9 +398,6 @@ LLVMValueRef codegen (Expr *e, int newScope)
 		case expr_ident:
 			val = codegenIdentExpr(e->expr);
 			break;
-		case expr_comm:
-			val = codegenCommandExpr(e->expr);
-			break;
 		case expr_proto:
 			val = codegenProtoExpr(e->expr);
 			break;
@@ -365,8 +407,15 @@ LLVMValueRef codegen (Expr *e, int newScope)
 		case expr_conditional:
 			val = codegenCondExpr(e->expr);
 			break;
+		case expr_comm:
+		{
+			CommandExpr *ce = e->expr;
+			codegen(ce->head, 0);
+			val = codegen(ce->tail, 0);
+			break;
+		}
 		default:
-			val = logError("Cannot generate IR for unrecognized expression type!", 0x2101);
+			val = logError("Cannot generate IR for unrecognized expression type!", 0x2001);
 			break;
 	}
 	scope -= (newScope != 0);

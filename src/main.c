@@ -10,7 +10,7 @@ int yylex_destroy();
 int yyparse();
 extern FILE *yyin;
 
-const char *version = "0.0.1";
+const char *version = "0.1";
 
 void printUsageInfo()
 {

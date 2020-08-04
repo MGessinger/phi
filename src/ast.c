@@ -171,8 +171,8 @@ void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
 		return;
-	clearStack(pe->inArgs, free);
-	clearStack(pe->outArgs, free);
+	clearStack(&(pe->inArgs), free);
+	clearStack(&(pe->outArgs), free);
 	free(pe->name);
 }
 

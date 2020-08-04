@@ -97,12 +97,12 @@ PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
 	| tok_func			{ $$ = newIdentExpr($1, id_func); }
 	| tok_var			{ $$ = newIdentExpr($1, id_var); }
 	| '(' QUEUE ')'			{ $$ = $2; }
-	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1100); }
+	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1101); }
 	;
 
 OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' | '%' ;
 
-MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1500); }
+MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1501); }
 	  ;
 
 /*=================================================*/
@@ -113,7 +113,7 @@ DEFINITION : DECLARATION QUEUE		{ $$ = newFunctionExpr($1, $2); }
 
 DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 					  if (outArgs == NULL)
-						ERROR("A Function must have at least one return type.", 0x1202)
+						ERROR("A Function must have at least one return type.", 0x1203)
 					  else
 						$$ = newProtoExpr($1, NULL, outArgs); }
 	    | TYPESIG tok_arr DECBODY TYPESIG	{ stack *inArgs = $1;
@@ -122,23 +122,23 @@ DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 						  ERROR("Found stray \"->\" in Function Prototype.", 0x1201)
 					  else if (outArgs == NULL)
 					  {
-						  clearStack(inArgs, free);
-						  ERROR("A Function must have at least one return type.", 0x1202)
+						  clearStack(&inArgs, free);
+						  ERROR("A Function must have at least one return type.", 0x1203)
 					  }
 					  else
 						  $$ = newProtoExpr($3, inArgs, outArgs); }
-	    | TYPESIG error		{ clearStack($1, free); ERROR("Expected a Function Name in Prototype.", 0x1203); }
+	    | TYPESIG error		{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1202); }
 	    ;
 
 DECBODY : tok_ident			{ needsName = 0; }
 		tok_arr			{ $$ = $1; }
-	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1400); }
+	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1401); }
 	;
 
 TYPESIG :				{ $$ = NULL; }
 	| TYPESIG TYPEARG ':' tok_ident	{ $$ = push($4, (int)$2, $1); }
 	| TYPESIG TYPEARG		{ if (needsName)
-						ERROR("All function parameters must be named in the form \"Type:Name\"!", 0x1300);
+						ERROR("All function parameters must be named in the form \"Type:Name\"!", 0x1301);
 					  $$ = push(NULL, $2, $1); }
 	;
 

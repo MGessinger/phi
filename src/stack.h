@@ -9,7 +9,7 @@ typedef struct stackitem {
 
 stack* push (void *newItem, int misc, stack *head);
 void* pop (stack **head);
-void clearStack (stack *head, void (*clear)(void*));
+void clearStack (stack **orighead, void (*clear)(void*));
 
 unsigned depth (stack *head);
 

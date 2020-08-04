@@ -18,7 +18,7 @@ $(NAME): parser.h $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LLVMFLAGS)
 
 clean:
-	rm $(OBJS)
+	rm $(OBJS) parser.h
 .PHONY: clean
 
 distclean: clean
