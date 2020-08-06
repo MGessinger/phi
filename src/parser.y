@@ -132,11 +132,10 @@ DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 					  }
 					  else
 						  $$ = newProtoExpr($3, inArgs, outArgs); }
-	    | TYPESIG error		{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1702); }
+	    | TYPESIG tok_arr error	{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1702); }
 	    ;
 
-DECBODY : tok_ident			{ needsName = 0; }
-		tok_arr			{ $$ = $1; }
+DECBODY : tok_ident tok_arr		{ needsName = 0; $$ = $1; }
 	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1601); }
 	;
 

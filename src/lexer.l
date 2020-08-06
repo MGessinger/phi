@@ -4,16 +4,18 @@
 #include "parser.h"
 char *copyString (const char *str, unsigned cutoff);
 %}
+
 %x COMMENT
-%s IDENTIFIER
-IDENT [a-zA-Z_][a-zA-Z0-9_]*
+
+IDENT	[[:alpha:]_][[:alnum:]_]*
+HEX	(?i:0x([[:xdigit:]])+(.[[:xdigit:]]+)?(p[+-]?[[:digit:]]+)?)
+DEC	([[:digit:]]*".")?[[:digit:]]+([eE][+-]?[[:digit:]]+)?
 %%
 "/*"			BEGIN(COMMENT);
 <COMMENT>"*/"		BEGIN(INITIAL);
-<COMMENT>\n		|
-<COMMENT>.		|
+<COMMENT>(?s:.)		|
 "//".*			|
-[ \t\n]
+[[:space:]]
 
 new			return keyword_new;
 extern			return keyword_extern;
@@ -26,7 +28,7 @@ Bool			return type_bool;
 Real			return type_real;
 String			return type_string;
 
--?([0-9]*".")?[0-9]+	{ yylval.numerical = strtod(yytext, NULL); return tok_number; }
+[+-]?({DEC}|{HEX})	{ yylval.numerical = atof(yytext); return tok_number; }
 True			{ yylval.numerical = 1; return tok_bool; }
 False			{ yylval.numerical = 0; return tok_bool; }
 

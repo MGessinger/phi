@@ -119,11 +119,20 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 		}
 		return valueStack->item;
 	}
+	else if (strncmp(ie->name, "dup", 4) == 0)
+	{
+		if (valueStack == NULL)
+			return logError("No value found to be duplicated.", 0x2402);
+		int misc = valueStack->misc;
+		void *item = valueStack->item;
+		valueStack = push(item, misc, valueStack);
+		return item;
+	}
 	/* Now see if the identifier should be a new Variable. If so, create it and push it on the stack. */
 	if (ie->flag == id_new)
 	{
 		if (valueStack == NULL)
-			return logError("Cannot assign variable without value.", 0x2402);
+			return logError("Cannot assign variable without value.", 0x2403);
 		LLVMValueRef value = pop(&valueStack);
 		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(value), ie->name);
 		LLVMBuildStore(phi_builder, value, alloca);
@@ -151,28 +160,39 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 				else
 				{
 					LLVMValueRef value = pop(&valueStack);
+					if (LLVMTypeOf(value) != LLVMGetElementType(LLVMTypeOf(variableAlloca)))
+						return logError("Type mismatch in Variable assignment.", 0x2404);
 					LLVMBuildStore(phi_builder, value, variableAlloca);
 					return value;
 				}
 			}
 		}
 		if (ie->flag == id_var)
-			return logError("Found explicit Variable request with unknown identifier name!", 0x2403);
+			return logError("Found explicit Variable request with unknown identifier name!", 0x2405);
 	}
 	LLVMValueRef tryFunction = codegenCallExpr(ie);
 	if (tryFunction != NULL)
 		return tryFunction;
-	return logError("Unrecognized identifier!", 0x2405);
+	return logError("Unrecognized identifier!", 0x2406);
 }
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 {
 	stack *globalValueStack = valueStack;
 	valueStack = NULL;
+
 	LLVMValueRef l = codegen(be->LHS, 0);
 	clearStack(&valueStack, NULL);
+	if (l == NULL)
+		return NULL;
+
 	LLVMValueRef r = codegen(be->RHS, 0);
-	if (l == NULL || r == NULL)
+	if (be->op == ':')
+	{
+		clearStack(&globalValueStack, NULL);
+		return r;
+	}
+	else if (r == NULL)
 		return NULL;
 
 	LLVMTypeRef lhsType = LLVMTypeOf(l);
@@ -182,15 +202,6 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
-		case ':':
-			while (valueStack != NULL)
-			{
-				int misc = valueStack->misc;
-				void *val = pop(&valueStack);
-				globalValueStack = push(val, misc, globalValueStack);
-			}
-			valueStack = globalValueStack;
-			return r;
 		case '+':
 			val = buildAppropriateAddition(l, r);
 			break;
@@ -293,6 +304,18 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		namesInScope = push(alloca, scope, namesInScope);
 		free(name);
 	}
+
+	/* Optionally, create variables for all named output parameters */
+	do {
+		LLVMTypeRef argType = getAppropriateType((pe->outArgs)->misc);
+		char *name = pop(&(pe->outArgs));
+		if (name != NULL)
+		{
+			LLVMValueRef alloca = CreateEntryPointAlloca(function, argType, name);
+			namesInScope = push(alloca, scope, namesInScope);
+			free(name);
+		}
+	} while (pe->outArgs != NULL);
 
 	LLVMValueRef body = codegen(fe->body, 0);
 	if (body == NULL)
@@ -490,7 +513,8 @@ LLVMValueRef codegen (Expr *e, int newScope)
 		case expr_comm:
 		{
 			CommandExpr *ce = e->expr;
-			codegen(ce->head, 0);
+			if (codegen(ce->head, 0) == NULL)
+				return NULL;
 			val = codegen(ce->tail, 0);
 			break;
 		}
