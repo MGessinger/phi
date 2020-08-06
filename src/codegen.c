@@ -21,16 +21,22 @@ static int scope = 0;
 
 LLVMTypeRef getAppropriateType (int typename)
 {
-	switch (typename)
+	LLVMTypeRef type = NULL;
+	switch (typename & 0xFFF)
 	{
 		case type_real:
-			return LLVMDoubleTypeInContext(phi_context);
+			type = LLVMDoubleTypeInContext(phi_context);
+			break;
 		case type_bool:
-			return LLVMInt1TypeInContext(phi_context);
+			type = LLVMInt1TypeInContext(phi_context);
+			break;
 		default:
 			return logError("Unknown Type Name!", 0x2101);
 	}
-	return NULL;
+	unsigned vecsize = (typename >> 16);
+	if (vecsize)
+		type = LLVMVectorType(type, vecsize);
+	return type;
 }
 
 LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, LLVMTypeRef varType, const char *name)
@@ -176,6 +182,67 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 	return logError("Unrecognized identifier!", 0x2406);
 }
 
+LLVMValueRef codegenAccessExpr (AccessExpr *ae)
+{
+	if (strncmp(ae->name, "store", 6) == 0)
+		return logError("Attempting to access a keyword as a vector.", 0x2501);
+
+	if (ae->flag == id_new)
+		return logError("Cannot create new vector from element.", 0x2502);
+
+	stack *globalValueStack = valueStack;
+	valueStack = NULL;
+	LLVMValueRef exVal = codegen(ae->idx, 1);
+	clearStack(&valueStack, NULL);
+	valueStack = globalValueStack;
+	if (exVal == NULL)
+		return NULL;
+	LLVMTypeKind exKind = LLVMGetTypeKind(LLVMTypeOf(exVal));
+	LLVMValueRef idxVal;
+	if (exKind == LLVMIntegerTypeKind)
+		idxVal = exVal;
+	else if (exKind == LLVMDoubleTypeKind)
+	{
+		LLVMTypeRef inttype = LLVMInt32TypeInContext(phi_context);
+		idxVal = LLVMBuildFPToSI(phi_builder, exVal, inttype, "idxcast");
+	}
+	else
+		return logError("Incompatible Type found in vector index.", 0x2503);
+
+	LLVMValueRef varAlloca = NULL;
+	size_t len = strlen(ae->name);
+	for (stack *r = namesInScope; r != NULL; r = r->next)
+	{
+		varAlloca = r->item;
+		const char *name = LLVMGetValueName(varAlloca);
+		if (strncmp(name, ae->name, len) == 0)
+		{
+			LLVMTypeRef vartype = LLVMGetElementType(LLVMTypeOf(varAlloca));
+			LLVMTypeKind varkind = LLVMGetTypeKind(vartype);
+			if (varkind != LLVMVectorTypeKind)
+				return logError("Cannot access variable that is not a vector.", 0x2504);
+
+			LLVMValueRef zero = LLVMConstNull(LLVMTypeOf(idxVal));
+			LLVMValueRef idxs[2] = {zero, idxVal};
+			if (ae->flag == id_var || valueStack == NULL || valueStack->misc == 0)
+			{
+				LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
+				LLVMValueRef load = LLVMBuildLoad(phi_builder, ptr, name);
+				valueStack = push(load, 0, valueStack);
+				return load;
+			}
+			else
+			{
+				LLVMValueRef value = pop(&valueStack);
+				LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
+				LLVMBuildStore(phi_builder, value, ptr);
+				return value;
+			}
+		}
+	}
+	return logError("Attempting to access an unknown vector!", 0x2505);
+}
+
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 {
 	stack *globalValueStack = valueStack;
@@ -215,10 +282,7 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 			val = buildAppropriateMultiplication(l, r);
 			break;
 		case '/':
-			if (lhsType != doubletype || rhsType != doubletype)
-				val = logError("Cannot divide variables of type other than Real", 0x2503);
-			else
-				val = LLVMBuildFDiv(phi_builder, l, r, "divtmp");
+			val = buildAppropriateDivision(l, r);
 			break;
 		case '<':
 			val = buildAppropriateCmp(l, r);
@@ -497,6 +561,9 @@ LLVMValueRef codegen (Expr *e, int newScope)
 			break;
 		case expr_ident:
 			val = codegenIdentExpr(e->expr);
+			break;
+		case expr_access:
+			val = codegenAccessExpr(e->expr);
 			break;
 		case expr_proto:
 			val = codegenProtoExpr(e->expr);
