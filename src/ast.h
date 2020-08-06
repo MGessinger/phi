@@ -16,6 +16,7 @@ typedef enum Expressions
 	expr_literal,
 	expr_binop,
 	expr_ident,
+	expr_access,
 	expr_proto,
 	expr_func,
 	expr_comm,
@@ -51,6 +52,12 @@ typedef struct IdentExprAST {
 	IdFlag flag;
 } IdentExpr;
 
+typedef struct AccessExprAST {
+	char *name;
+	IdFlag flag;
+	Expr *idx;
+} AccessExpr;
+
 typedef struct CommandExprAST {
 	Expr *head;
 	Expr *tail;
@@ -82,6 +89,7 @@ typedef struct LoopExprAST {
 Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name, IdFlag flag);
+Expr* newAccessExpr (Expr *ie, Expr *idx);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
 Expr* newCommandExpr (Expr *e1, Expr *e2);

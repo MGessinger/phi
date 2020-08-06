@@ -66,6 +66,27 @@ Expr* newIdentExpr (char *name, IdFlag flag)
 	return e;
 }
 
+Expr* newAccessExpr (Expr *ie, Expr *idx)
+{
+	Expr *e = newExpression(expr_access);
+	if (e == NULL)
+		return NULL;
+	AccessExpr *ae = malloc(sizeof(AccessExpr));
+	if (ae == NULL)
+	{
+		free(e);
+		return logError("Could not allocate Memory.", 0x103);
+	}
+	IdentExpr *ide = ie->expr;
+	ae->name = ide->name;
+	ae->flag = ide->flag;
+	ae->idx = idx;
+	e->expr = ae;
+	free(ie->expr);
+	free(ie);
+	return e;
+}
+
 Expr* newProtoExpr (char *name, stack *in, stack *out)
 {
 	Expr *e = newExpression(expr_proto);
@@ -173,6 +194,13 @@ void clearIdentExpr (IdentExpr *ie)
 	free(ie->name);
 }
 
+void clearAccessExpr (AccessExpr *ae)
+{
+	if (ae == NULL)
+		return;
+	free(ae->name);
+	clearExpr(ae->idx);
+}
 void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
@@ -227,6 +255,9 @@ void clearExpr (Expr *e)
 			break;
 		case expr_ident:
 			clearIdentExpr(e->expr);
+			break;
+		case expr_access:
+			clearAccessExpr(e->expr);
 			break;
 		case expr_proto:
 			clearProtoExpr(e->expr);
