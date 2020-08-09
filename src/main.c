@@ -51,6 +51,6 @@ int main (int argc, char **argv)
 		fclose(yyin);
 	}
 	yylex_destroy();
-	shutdownLLVM(0);
+	shutdownLLVM(1);
 	return 0;
 }

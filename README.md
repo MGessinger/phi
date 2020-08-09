@@ -4,6 +4,23 @@ Phi is a high-level, functional programming language, that combines the clean an
 
 An important feature of Phi, that sets it apart from almost all languages currently available, is the possibility to return more than one value. In current languages like Python, Haskell or F#, the only way to return more than one thing is through the use of Tuples. Phi supports this natively. An example of this can be found below.
 
+Currently, the Phi compiler can only produce the object file (`.o`) with the file name `output.o` and requires a linker to link this object file into an executable. You can also write an optional C file, to use it as an interface to Phi - more notes on that below.
+
+## Installation
+
+To build Phi from source, you need to have (F)Lex, Yacc/Bison and LLVM installed, as well as any odd C compiler (Clang will do the job just fine). Any Package Manager worth its storage space in Gold will be able to install these dependencies easily. For example, on a system running Arch Linux, use
+```
+pacman -S flex bison llvm
+```
+There are two options for building Phi. On the one hand, a Makefile is provided, so running `make` will probably work fine. However, it is recommended to use CMake instead. For the latter, run the following commands in the toplevel directory (where this file is located):
+```
+mkdir build
+cd build
+cmake ..
+make
+```
+This will produce an executable called `phi` in the directory called `build`. For usage information, run `phi -h`.
+
 ## Sample Code
 
 ```
@@ -26,6 +43,8 @@ A Phi-command consists of a sequence of Identifiers or Constant Literals. As men
 ### Variables
 
 Variables in Phi are categorized into two distinct groups. The first group is said to *provide* data, and consists of those variables that are used as input for some function call or function return value. The second group is said to *absorb* data and consists of variables that are used to store the result of a function call or literal.
+
+This can be thought of as a stack based system: If there is data on the stack, a variable will pop that data and store it away, otherwise it pushes its data onto the stack. Note however that this stack analysis is evaluated ad Compile time and therefore there is no overhead compared to direct assignments like C.
 
 Clearly, literals are always providing data, as their value cannot be changed. Whether a variable is providing or absorbing data, depends on its position in the surrounding command. By default, any variable occurring before a function call is providing data, any variable occurring after a function call is absorbing data. You can override the latter by appending ":v" to the variable name to declare it as providing data. Example:
 
@@ -61,9 +80,9 @@ The return value of the function is automatically created from the data availabl
 
 Unlike other functional languages, Phi provides basic Control Flow functionality, namely a while-loop and a conditional block (if-else). Their syntax is fairly similar, so it will only be explained for the loop, but can be translated to the conditional block by replacing all "while" by "if".
 
-A loop starts with the keyword *while* followed by an expression, which is used as the loop condition. After that comes the loop body, which consists of a single command or a sequence of commands enclosed in simple parentheses ('(' and ')'). The loop body ends with the keyword *end*. Optionally, instead of *end*, the loop can be followed by *else* and another command. This piece of code will be executed, if the loop body did not execute a single time. The *else* block need not be ended with *end* (and doing so will create a syntax error). Once again, to chain commands in this block, you must use parentheses.
+A loop starts with the keyword `while` followed by an expression, which is used as the loop condition. After that comes the loop body, which consists of a single command or a sequence of commands enclosed in simple parentheses ('(' and ')'). The loop body ends with the keyword `end`. Optionally, instead of `end`, the loop can be followed by `else` and another command. This piece of code will be executed, if the loop body did not execute a single time. The `else` block need not be ended with `end` (and doing so will create a syntax error). Once again, to chain commands in this block, you must use parentheses.
 
-*Note:* Variables use Block-scope. This means that any variable created in the loop-body is only available within the loop body, the same goes for the else-block. If you want to use a variable both inside and out of the loop, initialize it beforehand!
+**Note:** Variables use Block-scope. This means that any variable created in the loop-body is only available within the loop body, the same goes for the else-block. If you want to use a variable both inside and out of the loop, initialize it beforehand!
 
 ## Some Notes on Vectors, AVX and Optimization
 
@@ -81,7 +100,7 @@ In fact, using Vector Types in Phi is not strictly necessary, but doing so helps
 
 ## Interfacing with other languages
 
-Phi produces an object file. This object file can be linked against any other object file on the same target machine (i.e. the native host) by using any compiler/linker like Clang/GCC or the like. To declare a function that is defined elsewhere, use the *extern* keyword followed by the functions prototype. In this case, all parameter names can be omitted - and if any are provided, they are simply ignored. The type correspondences between Phi and C are given below.
+Phi produces an object file. This object file can be linked against any other object file on the same target machine (i.e. the native host) by using any compiler/linker like Clang/GCC or the like. To declare a function that is defined elsewhere, use the `extern` keyword followed by the functions prototype. In this case, all parameter names can be omitted - and if any are provided, they are simply ignored. The type correspondences between Phi and C are given below.
  * Real -> double
  * Bool -> int
 To make use of the multiple return values of a Phi function within a different language (say a C program calls a Phi function), you may be able to define a struct that contains the same fields in the same order. However there is no guarantee this will work in all cases.

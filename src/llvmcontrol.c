@@ -3,6 +3,7 @@
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
+#include <llvm-c/Analysis.h>
 
 #include "llvmcontrol.h"
 #include "ast.h"
@@ -70,15 +71,21 @@ void initialiseLLVM ()
 
 void shutdownLLVM (int emit)
 {
-	LLVMDumpModule(phi_module);
-	if (emit)
+	char *msg;
+	int verified = LLVMVerifyModule(phi_module, LLVMPrintMessageAction, &msg);
+	LLVMDisposeMessage(msg);
+	if (verified == 0)
 	{
-		char *errorMsg;
-		LLVMBool emitSuccess = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, "output.o", LLVMObjectFile, &errorMsg);
-		if (emitSuccess != 0)
+		LLVMDumpModule(phi_module);
+		if (emit)
 		{
-			logError(errorMsg, 0x2F01);
-			LLVMDisposeMessage(errorMsg);
+			char *errorMsg;
+			LLVMBool emitSuccess = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, "output.o", LLVMObjectFile, &errorMsg);
+			if (emitSuccess != 0)
+			{
+				logError(errorMsg, 0x2F01);
+				LLVMDisposeMessage(errorMsg);
+			}
 		}
 	}
 
