@@ -63,7 +63,7 @@ An important feature of Phi's ability to return multiple values is the fact that
 
 A function is declared using the *new* keyword, followed by the function's prototype, followed by a sequence of commands (chained with ':'). A Prototype defines the input arguments to the function, the functions name and its return values (in this order).
 
-The input arguments are simply a list of type-name pairs in the form *Type:Name*, where *Type* is either Real or Bool (More types are coming) and *Name* is any valid identifier. If another identifier with this name already exists, it will be shadowed for the duration of the function call, but it becomes available again once the function ends.
+The input arguments are simply a list of type-name pairs in the form *Type:Name*, where *Type* is one of Real, Int or Bool (More types are coming) and *Name* is any valid identifier. If another identifier with this name already exists, it will be shadowed for the duration of the function call, but it becomes available again once the function ends.
 
 The list of input arguments ends with an arrow (->), followed by an identifier used as the function name, another arrow and the output parameters. The latter are provided in the same way as the input arguments, with the exception that the name can be omitted, so a simple type name suffices. If an identifier is provided, then a local variable with that name will be created, however there is no association between the name and the output parameter - it is simply a syntactic simplification!
 
@@ -109,7 +109,10 @@ To make use of the multiple return values of a Phi function within a different l
 
 Phi defines the usual plethora of binary operators, however there are some important notes to be mentioned here. The list below shows the type constellation of the operation on the left and the corrensponding C-code on the right.
  * Bool:b1 \* Bool:b2 == b1 && b2
- * Bool:b1 \* Real:x1 == b1 ? x1 : 0
- * Real:x1 \* Bool:b2 == b2 ? x1 : 0
+ * Bool:b1 \* (Any):x1 == b1 ? x1 : 0
+ * (Any):x1 \* Bool:b2 == b2 ? x1 : 0
  * Bool:b1 \+ Bool:b2 == b1 ^ b2
+ * Bool:b1 \< Bool:b2 == !b1 && b2
 If both operands are of vector type, then the operations are performed elementwise. No scalar-vector mutiplication is supported as of now. The only exception are scalar booleans, in which case the entire vector is either kept or null'ed - depending on the truth value.
+
+The Modulo operator works as usual, if both operands are non-zero integers. If either of the operands is a Real, then the floating point remainder is computed, i.e. the remainder after subtracting the largest integer multiple of the right hand operand (e.g. 3 % 0.7 = 0.2, because 2.8 < 3). Additionally, if the right hand operand is zero, the result is simply the left hand operand. Note that this is consistent with the properties of a Euclidean Ring!

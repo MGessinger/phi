@@ -8,8 +8,12 @@ char *copyString (const char *str, unsigned cutoff);
 %x COMMENT
 
 IDENT	[[:alpha:]_][[:alnum:]_]*
-HEX	(?i:0x([[:xdigit:]])+(.[[:xdigit:]]+)?(p[+-]?[[:digit:]]+)?)
-DEC	([[:digit:]]*".")?[[:digit:]]+([eE][+-]?[[:digit:]]+)?
+
+HEXI	0[xX][[:xdigit:]]+
+DECI	[1-9][[:digit:]]*|0
+
+HEXF	0[Xx][[:xdigit:]]+(.[[:xdigit:]]+)?([pP][+-]?[[:digit:]]+)?|{HEXI}[fF]
+DECF	([[:digit:]]*".")?[[:digit:]]+([eE][+-]?[[:digit:]]+)?|{DECI}[fF]
 %%
 "/*"			BEGIN(COMMENT);
 <COMMENT>"*/"		BEGIN(INITIAL);
@@ -26,11 +30,12 @@ while			return keyword_while;
 
 Bool			return type_bool;
 Real			return type_real;
-String			return type_string;
+Int			return type_int;
 
-[+-]?({DEC}|{HEX})	{ yylval.numerical = atof(yytext); return tok_number; }
-True			{ yylval.numerical = 1; return tok_bool; }
-False			{ yylval.numerical = 0; return tok_bool; }
+[+-]?({DECI}|{HEXI})	{ yylval.integral = strtol(yytext, NULL, 0); return tok_int; }
+[+-]?({DECF}|{HEXF})	{ yylval.numerical = atof(yytext); return tok_real; }
+True			{ yylval.integral = 1; return tok_bool; }
+False			{ yylval.integral = 0; return tok_bool; }
 
 {IDENT}":!"		{ yylval.string = copyString(yytext, 2); return tok_new; }
 {IDENT}":v"		{ yylval.string = copyString(yytext, 2); return tok_var; }

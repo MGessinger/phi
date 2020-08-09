@@ -26,7 +26,8 @@ typedef enum Expressions
 
 enum Literals
 {
-	lit_number,
+	lit_real,
+	lit_int,
 	lit_bool
 };
 
@@ -38,7 +39,10 @@ typedef struct Expr {
 
 /* Specific Expression types */
 typedef struct LiteralExprAST {
-	double val;
+	union {
+		int integral;
+		double real;
+	} val;
 	int type;
 } LiteralExpr;
 

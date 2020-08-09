@@ -30,6 +30,9 @@ LLVMTypeRef getAppropriateType (int typename)
 		case type_bool:
 			type = LLVMInt1TypeInContext(phi_context);
 			break;
+		case type_int:
+			type = LLVMInt32TypeInContext(phi_context);
+			break;
 		default:
 			return logError("Unknown Type Name!", 0x2101);
 	}
@@ -55,16 +58,21 @@ LLVMValueRef CreateEntryPointAlloca (LLVMValueRef func, LLVMTypeRef varType, con
 
 LLVMValueRef codegenLiteralExpr (LiteralExpr *le)
 {
-	LLVMTypeRef doubleType = LLVMDoubleTypeInContext(phi_context);
-	LLVMTypeRef boolType = LLVMInt1TypeInContext(phi_context);
 	LLVMValueRef val = NULL;
+	LLVMTypeRef type;
 	switch (le->type)
 	{
-		case lit_number:
-			val = LLVMConstReal(doubleType, le->val);
+		case lit_real:
+			type = LLVMDoubleTypeInContext(phi_context);
+			val = LLVMConstReal(type, le->val.real);
+			break;
+		case lit_int:
+			type = LLVMInt32TypeInContext(phi_context);
+			val = LLVMConstInt(type, le->val.integral, 1);
 			break;
 		case lit_bool:
-			val = LLVMConstInt(boolType, (le->val)!=0, 0);
+			type = LLVMInt1TypeInContext(phi_context);
+			val = LLVMConstInt(type, (le->val.integral)!=0, 0);
 			break;
 		default:
 			return logError("Unknown literal type.", 0x2301);
@@ -262,10 +270,6 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	else if (r == NULL)
 		return NULL;
 
-	LLVMTypeRef lhsType = LLVMTypeOf(l);
-	LLVMTypeRef rhsType = LLVMTypeOf(r);
-
-	LLVMTypeRef doubletype = LLVMDoubleTypeInContext(phi_context);
 	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
@@ -273,10 +277,7 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 			val = buildAppropriateAddition(l, r);
 			break;
 		case '-':
-			if (lhsType != doubletype || rhsType != doubletype)
-				val = logError("Cannot subtract variables of type other than Real", 0x2502);
-			else
-				val = LLVMBuildFSub(phi_builder, l, r, "subtmp");
+			val = buildAppropriateSubtraction(l, r);
 			break;
 		case '*':
 			val = buildAppropriateMultiplication(l, r);
@@ -285,13 +286,13 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 			val = buildAppropriateDivision(l, r);
 			break;
 		case '<':
-			val = buildAppropriateCmp(l, r);
+			val = buildAppropriateComparison(l, r);
 			break;
 		case '=':
-			val = buildAppropriateEq(l, r);
+			val = buildAppropriateEquality(l, r);
 			break;
 		case '%':
-			val = buildAppropriateMod(l, r);
+			val = buildAppropriateModulo(l, r);
 			break;
 		default:
 			return logError("Unrecognized binary operator!", 0x2501);

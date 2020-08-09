@@ -25,7 +25,10 @@ Expr* newLiteralExpr (double val, int type)
 		free(e);
 		return logError("Could not allocate Memory.", 0x101);
 	}
-	ne->val = val;
+	if (type == lit_real)
+		ne->val.real = val;
+	else
+		ne->val.integral = val;
 	ne->type = type;
 	e->expr = ne;
 	return e;

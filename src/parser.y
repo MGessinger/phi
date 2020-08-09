@@ -15,8 +15,8 @@
 %token keyword_new keyword_extern
 %token keyword_if keyword_else keyword_while keyword_end
 %token <string>		tok_ident tok_new tok_var tok_func
-%token <numerical>	tok_number tok_bool tok_arr
-%token <numerical>	type_real type_string type_bool
+%token <numerical>	tok_real type_real tok_arr
+%token <integral>	type_int tok_int type_bool tok_bool
 
 %type <integral>	TYPEARG PRIMTYPE
 %type <string>		DECBODY
@@ -96,7 +96,8 @@ BINARYOP : EXPRESSION '+' EXPRESSION	{ $$ = newBinaryExpr('+', $1, $3); }
 	 ;
 
 PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
-	| tok_number			{ $$ = newLiteralExpr($1, lit_number); }
+	| tok_real			{ $$ = newLiteralExpr($1, lit_real); }
+	| tok_int			{ $$ = newLiteralExpr($1, lit_int); }
 	| '(' QUEUE ')'			{ $$ = $2; }
 	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1101); }
 	| IDENTIFY			{ $$ = $1; }
@@ -153,13 +154,13 @@ TYPESIG :				{ $$ = NULL; }
 	;
 
 TYPEARG : PRIMTYPE
-	| PRIMTYPE '<' tok_number '>'	{ $$ = ($1 | ((int)$3 << 16)); }
-	| PRIMTYPE '<' tok_number error	{ ERROR("Expected closing '>' in vector declaration.", 0x1502); }
+	| PRIMTYPE '<' tok_int '>'	{ $$ = ($1 | ((int)$3 << 16)); }
+	| PRIMTYPE '<' tok_int error	{ ERROR("Expected closing '>' in vector declaration.", 0x1502); }
 	| PRIMTYPE '<' error		{ ERROR("Expected Integer in Vector declaration.", 0x1501); }
 	;
 
 PRIMTYPE : type_real			{ $$ = type_real; }
-	 | type_string			{ $$ = type_string; }
+	 | type_int			{ $$ = type_int; }
 	 | type_bool			{ $$ = type_bool; }
 	 ;
 %%
