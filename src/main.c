@@ -5,10 +5,10 @@
 #include "stack.h"
 #include "llvmcontrol.h"
 
-int yylex();
-int yylex_destroy();
-int yyparse();
+extern int yylex_destroy();
+extern int yyparse();
 extern FILE *yyin;
+extern const char *filename;
 
 const char *version = "0.1";
 
@@ -45,8 +45,8 @@ int main (int argc, char **argv)
 		yyparse();
 	while (filesToParse != NULL)
 	{
-		const char *file = pop(&filesToParse);
-		yyin = fopen(file, "r");
+		filename = pop(&filesToParse);
+		yyin = fopen(filename, "r");
 		yyparse();
 		fclose(yyin);
 	}

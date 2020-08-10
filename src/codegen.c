@@ -115,7 +115,7 @@ LLVMValueRef codegenCallExpr (IdentExpr *ie)
 		return result;
 	}
 	unsigned numOfReturnTypes = LLVMCountStructElementTypes(returnType);
-	for (unsigned i = 0; i < numOfReturnTypes; i++)
+	for (int i = numOfReturnTypes-1; i >= 0; i--)
 	{
 		LLVMValueRef structElement = LLVMBuildExtractValue(phi_builder, result, i, "structelem");
 		valueStack = push(structElement, 1, valueStack);

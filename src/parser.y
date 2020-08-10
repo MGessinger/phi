@@ -32,10 +32,12 @@
 %left '%'
 %left '*' '/'
 %{
-	int yylex();
-	int yyerror();
-	int needsName;
-#define ERROR(a,b) { logError(a, b); YYERROR; }
+	extern int yylex();
+	static int yyerror();
+	static int needsName;
+	const char *filename = "";
+#define ERROR(a,b,c) { fprintf(stderr, "%s:%i:%i: ", filename, c.first_line, c.first_column); \
+	logError(a, b); YYERROR; }
 %}
 %%
 INPUT :
@@ -55,6 +57,7 @@ TOPLEVEL : error			{ $$ = NULL; }
 
 QUEUE	: MINIMAL
 	| QUEUE ':' MINIMAL		{ $$ = newBinaryExpr(':', $1, $3); }
+	| QUEUE ':'			{ ERROR("Expected Command after ':'.", 0x1001, @2); }
 	;
 
 MINIMAL : COMMAND
@@ -68,16 +71,16 @@ COMMAND : EXPRESSION
 
 IFBLOCK : keyword_if EXPRESSION MINIMAL keyword_else MINIMAL	{ $$ = newCondExpr($2, $3, $5); }
 	| keyword_if EXPRESSION MINIMAL keyword_end		{ $$ = newCondExpr($2, $3, NULL); }
-	| keyword_if EXPRESSION MINIMAL error			{ clearExpr($2); clearExpr($3); ERROR("Expected \"end\" or \"else\" after Conditional Expression.", 0x1303); }
-	| keyword_if EXPRESSION error				{ clearExpr($2); ERROR("Expected Command in Conditional statement.", 0x1302); }
-	| keyword_if error					{ ERROR("Expected Conditional Expression after \"if\".", 0x1301); }
+	| keyword_if EXPRESSION MINIMAL error			{ clearExpr($2); clearExpr($3); ERROR("Expected \"end\" or \"else\" after Conditional Expression.", 0x1303, @4); }
+	| keyword_if EXPRESSION error				{ clearExpr($2); ERROR("Expected Command in Conditional statement.", 0x1302, @3); }
+	| keyword_if error					{ ERROR("Expected Conditional Expression after \"if\".", 0x1301, @2); }
 	;
 
 LOOPEXP : keyword_while EXPRESSION MINIMAL keyword_else MINIMAL	{ $$ = newLoopExpr($2, $3, $5); }
 	| keyword_while EXPRESSION MINIMAL keyword_end		{ $$ = newLoopExpr($2, $3, NULL); }
-	| keyword_while EXPRESSION MINIMAL error		{ clearExpr($2); clearExpr($3); ERROR("Expected \"end\" or \"else\" after Loop Expression.", 0x1403); }
-	| keyword_while EXPRESSION error			{ clearExpr($2); ERROR("Expected Command in Loop Body.", 0x1402); }
-	| keyword_while error					{ ERROR("Expected Conditional Expression in Loop Head.", 0x1401); }
+	| keyword_while EXPRESSION MINIMAL error		{ clearExpr($2); clearExpr($3); ERROR("Expected \"end\" or \"else\" after Loop Expression.", 0x1403, @4); }
+	| keyword_while EXPRESSION error			{ clearExpr($2); ERROR("Expected Command in Loop Body.", 0x1402, @3); }
+	| keyword_while error					{ ERROR("Expected Conditional Expression in Loop Head.", 0x1401, @2); }
 	;
 
 EXPRESSION : BINARYOP
@@ -99,10 +102,10 @@ PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
 	| tok_real			{ $$ = newLiteralExpr($1, lit_real); }
 	| tok_int			{ $$ = newLiteralExpr($1, lit_int); }
 	| '(' QUEUE ')'			{ $$ = $2; }
-	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1101); }
+	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1101, @3); }
 	| IDENTIFY			{ $$ = $1; }
 	| IDENTIFY '[' EXPRESSION ']'	{ $$ = newAccessExpr($1, $3); }
-	| IDENTIFY '[' EXPRESSION error	{ clearExpr($1); clearExpr($3); ERROR("Expected closing ']' in subscript.", 0x1102); }
+	| IDENTIFY '[' EXPRESSION error	{ clearExpr($1); clearExpr($3); ERROR("Expected closing ']' in subscript.", 0x1102, @4); }
 	;
 
 IDENTIFY : tok_ident			{ $$ = newIdentExpr($1, id_any, 1); }
@@ -115,7 +118,7 @@ IDENTIFY : tok_ident			{ $$ = newIdentExpr($1, id_any, 1); }
 
 OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' | '%' ;
 
-MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1201); }
+MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Operand for binary operator.", 0x1201, @3); }
 	  ;
 
 /*=================================================*\
@@ -127,31 +130,31 @@ DEFINITION : DECLARATION QUEUE		{ $$ = newFunctionExpr($1, $2); }
 
 DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 					  if (outArgs == NULL)
-						ERROR("A Function must have at least one return type.", 0x1803)
+						ERROR("A Function must have at least one return type.", 0x1803, @2)
 					  else
 						$$ = newProtoExpr($1, NULL, outArgs); }
 	    | TYPESIG tok_arrow DECBODY TYPESIG	{ stack *inArgs = $1;
 					  stack *outArgs = $4;
 					  if (inArgs == NULL)
-						  ERROR("Found stray \"->\" in Function Prototype.", 0x1801)
+						  ERROR("Found stray \"->\" in Function Prototype.", 0x1801, @1)
 					  else if (outArgs == NULL)
 					  {
 						  clearStack(&inArgs, free);
-						  ERROR("A Function must have at least one return type.", 0x1803)
+						  ERROR("A Function must have at least one return type.", 0x1803, @4)
 					  }
 					  else
 						  $$ = newProtoExpr($3, inArgs, outArgs); }
-	    | TYPESIG tok_arrow error	{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1702); }
+	    | TYPESIG tok_arrow error	{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1802, @3); }
 	    ;
 
 DECBODY : tok_ident tok_arrow		{ needsName = 0; $$ = $1; }
-	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1701); }
+	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1701, @1); }
 	;
 
 TYPESIG :				{ $$ = NULL; }
 	| TYPESIG TYPEARG ':' tok_ident	{ $$ = push($4, $2, $1); }
 	| TYPESIG TYPEARG		{ if (needsName)
-						ERROR("All function parameters must be named in the form \"Type:Name\"!", 0x1601);
+						ERROR("All function parameters must be named in the form \"Type:Name\"!", 0x1601, @2);
 					  $$ = push(NULL, $2, $1); }
 	;
 
@@ -161,13 +164,13 @@ TYPEARG : PRIMTYPE
 	;
 
 ARRAYS : PRIMTYPE '[' tok_int ']'	{ $$ = ($1 | ($3 << 16)); }
-       | PRIMTYPE '[' tok_int error	{ ERROR("Expected closing ']' in Array declaration.", 0x1502); }
-       | PRIMTYPE '[' error		{ ERROR("Expected Integer in Array declaration.", 0x1501); }
+       | PRIMTYPE '[' tok_int error	{ ERROR("Expected closing ']' in Array declaration.", 0x1512, @4); }
+       | PRIMTYPE '[' error		{ ERROR("Expected Integer in Array declaration.", 0x1511, @3); }
        ;
 
 VECTORS : PRIMTYPE '<' tok_int '>'	{ $$ = ($1 | ($3 << 12)); }
-	| PRIMTYPE '<' tok_int error	{ ERROR("Expected closing '>' in vector declaration.", 0x1502); }
-	| PRIMTYPE '<' error		{ ERROR("Expected Integer in Vector declaration.", 0x1501); }
+	| PRIMTYPE '<' tok_int error	{ ERROR("Expected closing '>' in vector declaration.", 0x1522, @4); }
+	| PRIMTYPE '<' error		{ ERROR("Expected Integer in Vector declaration.", 0x1521, @3); }
 	;
 
 PRIMTYPE : type_real			{ $$ = type_real; }
