@@ -7,22 +7,22 @@
 %}
 %union
 {
-	double numerical;
 	int integral;
-	char *string;
 	void *pointer;
+	double numerical;
 }
 %token keyword_new keyword_extern
 %token keyword_if keyword_else keyword_while keyword_end
-%token <string>		tok_ident tok_new tok_var tok_func
-%token <numerical>	tok_real type_real tok_arr
-%token <integral>	type_int tok_int type_bool tok_bool
+%token type_real type_bool type_int
+%token tok_new tok_var tok_func tok_arrow
+%token <integral>	tok_int tok_bool tok_vec tok_array
+%token <pointer>	tok_ident
+%token <numerical>	tok_real
 
-%type <integral>	TYPEARG PRIMTYPE
-%type <string>		DECBODY
-%type <pointer>		TOPLEVEL MINIMAL COMMAND QUEUE
-%type <pointer>		DECLARATION DEFINITION TYPESIG
-%type <pointer>		EXPRESSION PRIMARY BINARYOP MALFORMED IFBLOCK LOOPEXP IDENTIFY
+%type <integral>	TYPEARG PRIMTYPE VECTORS ARRAYS
+%type <pointer>		TOPLEVEL QUEUE MINIMAL COMMAND IFBLOCK LOOPEXP
+%type <pointer>		DECLARATION DEFINITION TYPESIG DECBODY
+%type <pointer>		EXPRESSION BINARYOP PRIMARY IDENTIFY MALFORMED
 
 %right '='
 
@@ -102,13 +102,15 @@ PRIMARY : tok_bool			{ $$ = newLiteralExpr($1, lit_bool); }
 	| '(' QUEUE error		{ clearExpr($2); ERROR("Expected ')' while parsing Command.", 0x1101); }
 	| IDENTIFY			{ $$ = $1; }
 	| IDENTIFY '[' EXPRESSION ']'	{ $$ = newAccessExpr($1, $3); }
-	| IDENTIFY '[' EXPRESSION error	{ clearExpr($1); clearExpr($3); ERROR("Expected closing ']' in array index.", 0x1102); }
+	| IDENTIFY '[' EXPRESSION error	{ clearExpr($1); clearExpr($3); ERROR("Expected closing ']' in subscript.", 0x1102); }
 	;
 
-IDENTIFY : tok_ident			{ $$ = newIdentExpr($1, id_any); }
-	 | tok_new			{ $$ = newIdentExpr($1, id_new); }
-	 | tok_func			{ $$ = newIdentExpr($1, id_func); }
-	 | tok_var			{ $$ = newIdentExpr($1, id_var); }
+IDENTIFY : tok_ident			{ $$ = newIdentExpr($1, id_any, 1); }
+	 | tok_ident tok_new		{ $$ = newIdentExpr($1, id_new, 1); }
+	 | tok_ident tok_vec		{ $$ = newIdentExpr($1, id_vec, $2); }
+	 | tok_ident tok_array		{ $$ = newIdentExpr($1, id_array, $2); }
+	 | tok_ident tok_func		{ $$ = newIdentExpr($1, id_func, 1); }
+	 | tok_ident tok_var		{ $$ = newIdentExpr($1, id_var, 1); }
 	 ;
 
 OP : '+' | '-' | '*' | '/' | '>' | '<' | '=' | '%' ;
@@ -128,7 +130,7 @@ DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 						ERROR("A Function must have at least one return type.", 0x1803)
 					  else
 						$$ = newProtoExpr($1, NULL, outArgs); }
-	    | TYPESIG tok_arr DECBODY TYPESIG	{ stack *inArgs = $1;
+	    | TYPESIG tok_arrow DECBODY TYPESIG	{ stack *inArgs = $1;
 					  stack *outArgs = $4;
 					  if (inArgs == NULL)
 						  ERROR("Found stray \"->\" in Function Prototype.", 0x1801)
@@ -139,10 +141,10 @@ DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;
 					  }
 					  else
 						  $$ = newProtoExpr($3, inArgs, outArgs); }
-	    | TYPESIG tok_arr error	{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1702); }
+	    | TYPESIG tok_arrow error	{ clearStack((stack**)&($1), free); ERROR("Expected a Function Name in Prototype.", 0x1702); }
 	    ;
 
-DECBODY : tok_ident tok_arr		{ needsName = 0; $$ = $1; }
+DECBODY : tok_ident tok_arrow		{ needsName = 0; $$ = $1; }
 	| tok_ident			{ free($1); ERROR("A function must have at least one return type! Are you missing a \"->\"?", 0x1701); }
 	;
 
@@ -154,7 +156,16 @@ TYPESIG :				{ $$ = NULL; }
 	;
 
 TYPEARG : PRIMTYPE
-	| PRIMTYPE '<' tok_int '>'	{ $$ = ($1 | ((int)$3 << 16)); }
+	| VECTORS
+	| ARRAYS
+	;
+
+ARRAYS : PRIMTYPE '[' tok_int ']'	{ $$ = ($1 | ($3 << 16)); }
+       | PRIMTYPE '[' tok_int error	{ ERROR("Expected closing ']' in Array declaration.", 0x1502); }
+       | PRIMTYPE '[' error		{ ERROR("Expected Integer in Array declaration.", 0x1501); }
+       ;
+
+VECTORS : PRIMTYPE '<' tok_int '>'	{ $$ = ($1 | ($3 << 12)); }
 	| PRIMTYPE '<' tok_int error	{ ERROR("Expected closing '>' in vector declaration.", 0x1502); }
 	| PRIMTYPE '<' error		{ ERROR("Expected Integer in Vector declaration.", 0x1501); }
 	;

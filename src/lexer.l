@@ -1,8 +1,8 @@
 %{
 #define YY_NO_INPUT
 #define YY_NO_UNPUT
+#include <string.h>
 #include "parser.h"
-char *copyString (const char *str, unsigned cutoff);
 %}
 
 %x COMMENT
@@ -14,6 +14,8 @@ DECI	[1-9][[:digit:]]*|0
 
 HEXF	0[Xx][[:xdigit:]]+(.[[:xdigit:]]+)?([pP][+-]?[[:digit:]]+)?|{HEXI}[fF]
 DECF	([[:digit:]]*".")?[[:digit:]]+([eE][+-]?[[:digit:]]+)?|{DECI}[fF]
+
+INT	({HEXI}|{DECI})
 %%
 "/*"			BEGIN(COMMENT);
 <COMMENT>"*/"		BEGIN(INITIAL);
@@ -32,32 +34,22 @@ Bool			return type_bool;
 Real			return type_real;
 Int			return type_int;
 
-[+-]?({DECI}|{HEXI})	{ yylval.integral = strtol(yytext, NULL, 0); return tok_int; }
-[+-]?({DECF}|{HEXF})	{ yylval.numerical = atof(yytext); return tok_real; }
+-?{INT}			{ yylval.integral = strtol(yytext, NULL, 0); return tok_int; }
+-?({DECF}|{HEXF})	{ yylval.numerical = atof(yytext); return tok_real; }
 True			{ yylval.integral = 1; return tok_bool; }
 False			{ yylval.integral = 0; return tok_bool; }
 
-{IDENT}":!"		{ yylval.string = copyString(yytext, 2); return tok_new; }
-{IDENT}":v"		{ yylval.string = copyString(yytext, 2); return tok_var; }
-{IDENT}":f"		{ yylval.string = copyString(yytext, 2); return tok_func; }
-{IDENT}			{ yylval.string = copyString(yytext, 0); return tok_ident; }
+{IDENT}			{ yylval.pointer = strndup(yytext, yyleng); return tok_ident; }
+":<"{INT}">"		{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_vec; }
+":["{INT}"]"		{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_array; }
 
-"->"			return tok_arr;
+":!"			return tok_new;
+":v"			return tok_var;
+":f"			return tok_func;
+"->"			return tok_arrow;
+
 .			return yytext[0];
 %%
-char* copyString (const char *str, unsigned cutoff)
-{
-	if (str == NULL)
-		return NULL;
-	size_t len = strlen(str) - cutoff;
-	char *copy = malloc((strlen(str)+1)*sizeof(char));
-	if (copy == NULL)
-		return NULL;
-	strcpy(copy, str);
-	copy[len] = '\0';
-	return copy;
-}
-
 int yywrap ()
 {
 	return 1;

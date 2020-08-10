@@ -8,7 +8,9 @@ typedef enum IdentifierFlags
 	id_any,
 	id_var,
 	id_func,
-	id_new
+	id_new,
+	id_vec,
+	id_array
 } IdFlag;
 
 typedef enum Expressions
@@ -54,6 +56,7 @@ typedef struct BinaryExprAST {
 typedef struct IdentExprAST {
 	char *name;
 	IdFlag flag;
+	unsigned size;
 } IdentExpr;
 
 typedef struct AccessExprAST {
@@ -92,7 +95,7 @@ typedef struct LoopExprAST {
 
 Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
-Expr* newIdentExpr (char *name, IdFlag flag);
+Expr* newIdentExpr (char *name, IdFlag flag, unsigned size);
 Expr* newAccessExpr (Expr *ie, Expr *idx);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);

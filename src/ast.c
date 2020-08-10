@@ -52,7 +52,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 	return e;
 }
 
-Expr* newIdentExpr (char *name, IdFlag flag)
+Expr* newIdentExpr (char *name, IdFlag flag, unsigned size)
 {
 	Expr *e = newExpression(expr_ident);
 	if (e == NULL)
@@ -65,6 +65,7 @@ Expr* newIdentExpr (char *name, IdFlag flag)
 	}
 	ie->name = name;
 	ie->flag = flag;
+	ie->size = size;
 	e->expr = ie;
 	return e;
 }

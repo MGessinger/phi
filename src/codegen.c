@@ -36,9 +36,14 @@ LLVMTypeRef getAppropriateType (int typename)
 		default:
 			return logError("Unknown Type Name!", 0x2101);
 	}
-	unsigned vecsize = (typename >> 16);
-	if (vecsize)
+	unsigned arraysize = (typename >> 16);
+	unsigned vecsize = (typename >> 12) & 0xF;
+	if (vecsize != 0 && arraysize != 0)
+		return logError("Vector size exceeds internal limit of 15.", 0x2102);
+	else if (vecsize != 0)
 		type = LLVMVectorType(type, vecsize);
+	else if (arraysize != 0)
+		type = LLVMArrayType(type, arraysize);
 	return type;
 }
 
@@ -145,13 +150,33 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 	/* Now see if the identifier should be a new Variable. If so, create it and push it on the stack. */
 	if (ie->flag == id_new)
 	{
-		if (valueStack == NULL)
+		LLVMValueRef topOfStack = pop(&valueStack);
+		if (topOfStack == NULL)
 			return logError("Cannot assign variable without value.", 0x2403);
-		LLVMValueRef value = pop(&valueStack);
-		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(value), ie->name);
-		LLVMBuildStore(phi_builder, value, alloca);
+		LLVMValueRef alloca = CreateEntryPointAlloca(NULL, LLVMTypeOf(topOfStack), ie->name);
+		LLVMBuildStore(phi_builder, topOfStack, alloca);
 		namesInScope = push(alloca, scope, namesInScope);
-		return value;
+		return topOfStack;
+	}
+	else if (ie->flag == id_vec)
+	{
+		LLVMValueRef topOfStack = pop(&valueStack);
+		if (topOfStack == NULL)
+			return logError("Cannot infer Vector Type without value.", 0x2404);
+		LLVMTypeRef vectorType = LLVMVectorType(LLVMTypeOf(topOfStack), ie->size);
+		LLVMValueRef vecAlloca = CreateEntryPointAlloca(NULL, vectorType, ie->name);
+		namesInScope = push(vecAlloca, scope, namesInScope);
+		return vecAlloca;
+	}
+	else if (ie->flag == id_array)
+	{
+		LLVMValueRef topOfStack = pop(&valueStack);
+		if (topOfStack == NULL)
+			return logError("Cannot infer Array Type without value.", 0x2404);
+		LLVMTypeRef arrayType = LLVMArrayType(LLVMTypeOf(topOfStack), ie->size);
+		LLVMValueRef arrAlloca = CreateEntryPointAlloca(NULL, arrayType, ie->name);
+		namesInScope = push(arrAlloca, scope, namesInScope);
+		return arrAlloca;
 	}
 
 	/* Now test for an existing variable. */
@@ -173,49 +198,42 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 				}
 				else
 				{
-					LLVMValueRef value = pop(&valueStack);
-					if (LLVMTypeOf(value) != LLVMGetElementType(LLVMTypeOf(variableAlloca)))
-						return logError("Type mismatch in Variable assignment.", 0x2404);
-					LLVMBuildStore(phi_builder, value, variableAlloca);
-					return value;
+					LLVMValueRef topOfStack = pop(&valueStack);
+					if (LLVMTypeOf(topOfStack) != LLVMGetAllocatedType(variableAlloca))
+						return logError("Type mismatch in Variable assignment.", 0x2405);
+					LLVMBuildStore(phi_builder, topOfStack, variableAlloca);
+					return topOfStack;
 				}
 			}
 		}
 		if (ie->flag == id_var)
-			return logError("Found explicit Variable request with unknown identifier name!", 0x2405);
+			return logError("Found explicit Variable request with unknown identifier name!", 0x2406);
 	}
 	LLVMValueRef tryFunction = codegenCallExpr(ie);
 	if (tryFunction != NULL)
 		return tryFunction;
-	return logError("Unrecognized identifier!", 0x2406);
+	return logError("Unrecognized identifier!", 0x2407);
 }
 
 LLVMValueRef codegenAccessExpr (AccessExpr *ae)
 {
 	if (strncmp(ae->name, "store", 6) == 0)
 		return logError("Attempting to access a keyword as a vector.", 0x2501);
-
-	if (ae->flag == id_new)
-		return logError("Cannot create new vector from element.", 0x2502);
+	if (strncmp(ae->name, "dup", 4) == 0)
+		return logError("Attempting to access a keyword as a vector.", 0x2502);
 
 	stack *globalValueStack = valueStack;
 	valueStack = NULL;
-	LLVMValueRef exVal = codegen(ae->idx, 1);
+	LLVMValueRef idxVal = codegen(ae->idx, 1);
 	clearStack(&valueStack, NULL);
 	valueStack = globalValueStack;
-	if (exVal == NULL)
+	if (idxVal == NULL)
 		return NULL;
-	LLVMTypeKind exKind = LLVMGetTypeKind(LLVMTypeOf(exVal));
-	LLVMValueRef idxVal;
-	if (exKind == LLVMIntegerTypeKind)
-		idxVal = exVal;
-	else if (exKind == LLVMDoubleTypeKind)
-	{
-		LLVMTypeRef inttype = LLVMInt32TypeInContext(phi_context);
-		idxVal = LLVMBuildFPToSI(phi_builder, exVal, inttype, "idxcast");
-	}
-	else
-		return logError("Incompatible Type found in vector index.", 0x2503);
+
+	LLVMTypeRef idxType = LLVMTypeOf(idxVal);
+	LLVMTypeKind idxKind = LLVMGetTypeKind(idxType);
+	if (idxKind != LLVMIntegerTypeKind)
+		return logError("Incompatible Type found in vector index.", 0x2504);
 
 	LLVMValueRef varAlloca = NULL;
 	size_t len = strlen(ae->name);
@@ -223,32 +241,50 @@ LLVMValueRef codegenAccessExpr (AccessExpr *ae)
 	{
 		varAlloca = r->item;
 		const char *name = LLVMGetValueName(varAlloca);
-		if (strncmp(name, ae->name, len) == 0)
-		{
-			LLVMTypeRef vartype = LLVMGetElementType(LLVMTypeOf(varAlloca));
-			LLVMTypeKind varkind = LLVMGetTypeKind(vartype);
-			if (varkind != LLVMVectorTypeKind)
-				return logError("Cannot access variable that is not a vector.", 0x2504);
+		if (strncmp(name, ae->name, len) != 0)
+			continue;
 
-			LLVMValueRef zero = LLVMConstNull(LLVMTypeOf(idxVal));
-			LLVMValueRef idxs[2] = {zero, idxVal};
-			if (ae->flag == id_var || valueStack == NULL || valueStack->misc == 0)
+		LLVMTypeRef vartype = LLVMGetAllocatedType(varAlloca);
+		LLVMTypeKind varkind = LLVMGetTypeKind(vartype);
+		if (varkind != LLVMVectorTypeKind && varkind != LLVMArrayTypeKind)
+			return logError("Cannot access variable that is not a vector or array.", 0x2505);
+		else if (LLVMIsConstant(idxVal))
+		{
+			int index = LLVMConstIntGetSExtValue(idxVal);
+			if (index < 0)
+				return logError("Negative index in Array access.", 0x2506);
+			if (varkind == LLVMArrayTypeKind)
 			{
-				LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
-				LLVMValueRef load = LLVMBuildLoad(phi_builder, ptr, name);
-				valueStack = push(load, 0, valueStack);
-				return load;
+				int arrayLength = LLVMGetArrayLength(vartype);
+				if (index >= arrayLength)
+					return logError("Constant index beyond bounds of the array.", 0x2507);
 			}
-			else
+			else if (varkind == LLVMVectorTypeKind)
 			{
-				LLVMValueRef value = pop(&valueStack);
-				LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
-				LLVMBuildStore(phi_builder, value, ptr);
-				return value;
+				int vectorlength = LLVMGetVectorSize(vartype);
+				if (index >= vectorlength)
+					return logError("Constant index beyond bounds of the vector.", 0x2508);
 			}
 		}
+
+		LLVMValueRef zero = LLVMConstNull(idxType);
+		LLVMValueRef idxs[2] = {zero, idxVal};
+		if (ae->flag == id_var || valueStack == NULL || valueStack->misc == 0)
+		{
+			LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
+			LLVMValueRef load = LLVMBuildLoad(phi_builder, ptr, name);
+			valueStack = push(load, 0, valueStack);
+			return load;
+		}
+		else
+		{
+			LLVMValueRef value = pop(&valueStack);
+			LLVMValueRef ptr = LLVMBuildGEP(phi_builder, varAlloca, idxs, 2, "geptmp");
+			LLVMBuildStore(phi_builder, value, ptr);
+			return value;
+		}
 	}
-	return logError("Attempting to access an unknown vector!", 0x2505);
+	return logError("Attempting to access an unknown vector!", 0x2509);
 }
 
 LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
