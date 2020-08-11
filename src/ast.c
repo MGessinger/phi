@@ -126,23 +126,6 @@ Expr* newFunctionExpr (Expr *proto, Expr *body)
 	return e;
 }
 
-Expr* newCommandExpr (Expr *e1, Expr *e2)
-{
-	Expr *e = newExpression(expr_comm);
-	if (e == NULL)
-		return NULL;
-	CommandExpr *ce = malloc(sizeof(CommandExpr));
-	if (ce == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x106);
-	}
-	ce->head = e1;
-	ce->tail = e2;
-	e->expr = ce;
-	return e;
-}
-
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False)
 {
 	Expr *e = newExpression(expr_conditional);
@@ -222,14 +205,6 @@ void clearFunctionExpr (FunctionExpr *fe)
 	clearExpr(fe->body);
 }
 
-void clearCommandExpr (CommandExpr *ce)
-{
-	if (ce == NULL)
-		return;
-	clearExpr(ce->head);
-	clearExpr(ce->tail);
-}
-
 void clearCondExpr (CondExpr *ce)
 {
 	if (ce == NULL)
@@ -268,9 +243,6 @@ void clearExpr (Expr *e)
 			break;
 		case expr_func:
 			clearFunctionExpr(e->expr);
-			break;
-		case expr_comm:
-			clearCommandExpr(e->expr);
 			break;
 		case expr_conditional:
 			clearCondExpr(e->expr);

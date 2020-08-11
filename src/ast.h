@@ -21,7 +21,6 @@ typedef enum Expressions
 	expr_access,
 	expr_proto,
 	expr_func,
-	expr_comm,
 	expr_conditional,
 	expr_loop
 } ExprType;
@@ -65,11 +64,6 @@ typedef struct AccessExprAST {
 	Expr *idx;
 } AccessExpr;
 
-typedef struct CommandExprAST {
-	Expr *head;
-	Expr *tail;
-} CommandExpr;
-
 typedef struct ProtoExprAST {
 	stack *inArgs;
 	stack *outArgs;
@@ -99,7 +93,6 @@ Expr* newIdentExpr (char *name, IdFlag flag, unsigned size);
 Expr* newAccessExpr (Expr *ie, Expr *idx);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
 Expr* newFunctionExpr (Expr *proto, Expr *body);
-Expr* newCommandExpr (Expr *e1, Expr *e2);
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
 Expr* newLoopExpr (Expr *Cond, Expr *body, Expr *Else);
 

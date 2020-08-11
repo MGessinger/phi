@@ -66,7 +66,7 @@ MINIMAL : COMMAND
 	;
 
 COMMAND : EXPRESSION
-	| COMMAND EXPRESSION		{ $$ = newCommandExpr($1, $2); }
+	| COMMAND EXPRESSION		{ $$ = newBinaryExpr(' ', $1, $2); }
 	;
 
 IFBLOCK : keyword_if EXPRESSION MINIMAL keyword_else MINIMAL	{ $$ = newCondExpr($2, $3, $5); }

@@ -293,22 +293,23 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	valueStack = NULL;
 
 	LLVMValueRef l = codegen(be->LHS, 0);
-	clearStack(&valueStack, NULL);
+	if (be->op != ' ')
+		clearStack(&valueStack, NULL);
 	if (l == NULL)
 		return NULL;
 
 	LLVMValueRef r = codegen(be->RHS, 0);
-	if (be->op == ':')
-	{
-		clearStack(&globalValueStack, NULL);
-		return r;
-	}
-	else if (r == NULL)
+	if (r == NULL)
 		return NULL;
 
 	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
+		case ':':
+			clearStack(&globalValueStack, NULL);
+			return r;
+		case ' ':
+			return r;
 		case '+':
 			val = buildAppropriateAddition(l, r);
 			break;
@@ -614,14 +615,6 @@ LLVMValueRef codegen (Expr *e, int newScope)
 		case expr_loop:
 			val = codegenLoopExpr(e->expr);
 			break;
-		case expr_comm:
-		{
-			CommandExpr *ce = e->expr;
-			if (codegen(ce->head, 0) == NULL)
-				return NULL;
-			val = codegen(ce->tail, 0);
-			break;
-		}
 		default:
 			val = logError("Cannot generate IR for unrecognized expression type!", 0x2001);
 			break;
