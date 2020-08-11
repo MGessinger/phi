@@ -10,6 +10,7 @@ static int curcol = 0;
 %}
 %option yylineno
 %x COMMENT
+%x IDENT
 
 IDENT	[[:alpha:]_][[:alnum:]_]*
 
@@ -44,13 +45,14 @@ Int			return type_int;
 True			{ yylval.integral = 1; return tok_bool; }
 False			{ yylval.integral = 0; return tok_bool; }
 
-{IDENT}			{ yylval.pointer = strndup(yytext, yyleng); return tok_ident; }
-":<"{INT}">"		{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_vec; }
-":["{INT}"]"		{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_array; }
+{IDENT}			{ yylval.pointer = strndup(yytext, yyleng); BEGIN(IDENT); return tok_ident; }
+<IDENT>":<"{INT}">"	{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_vec; }
+<IDENT>":["{INT}"]"	{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_array; }
 
-":!"			return tok_new;
-":v"			return tok_var;
-":f"			return tok_func;
+<IDENT>":!"		return tok_new;
+<IDENT>":v"		return tok_var;
+<IDENT>":f"		return tok_func;
+<IDENT>.|\n		{ BEGIN(INITIAL); yyless(0); }
 "->"			return tok_arrow;
 
 .			return yytext[0];
