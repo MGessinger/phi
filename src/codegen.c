@@ -425,6 +425,19 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		LLVMDeleteFunction(function);
 		return NULL;
 	}
+	LLVMValueRef ret;
+	if (fe->ret != NULL)
+	{
+		clearStack(&valueStack, NULL);
+		ret = codegen(fe->ret, 0);
+		if (ret == NULL)
+		{
+			LLVMDeleteFunction(function);
+			return NULL;
+		}
+	}
+	else
+		ret = body; /* Use the last value of the body as default return value */
 	LLVMTypeRef funcType = LLVMGetElementType(LLVMTypeOf(function));
 	LLVMTypeRef returnType = LLVMGetReturnType(funcType);
 	if (LLVMGetTypeKind(returnType) == LLVMStructTypeKind)
@@ -450,7 +463,7 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	else if (valueStack != NULL)
 		LLVMBuildRet(phi_builder, pop(&valueStack));
 	else
-		LLVMBuildRet(phi_builder, body);
+		LLVMBuildRet(phi_builder, ret);
 	int verified = LLVMVerifyFunction(function, LLVMPrintMessageAction);
 	if (verified == 1)
 	{

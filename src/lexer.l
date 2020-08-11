@@ -31,6 +31,7 @@ INT	({HEXI}|{DECI})
 
 new			return keyword_new;
 extern			return keyword_extern;
+from			return keyword_from;
 if			return keyword_if;
 else			return keyword_else;
 end			return keyword_end;

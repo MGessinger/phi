@@ -26,14 +26,22 @@ This will produce an executable called `phi` in the directory called `build`. Fo
 ```
 /* Compute the square root of a using the Babylonian Method and return square root and error */
 new Real:a -> babylon -> Real:sqrt Real:err
+sqrt err from
 	a abs a :
 	1 store sqrt :
 	sqrt-a abs err :
 	while err > 0.00001 (
 		(sqrt + a/sqrt)/2 store sqrt :
 		sqrt-a/sqrt abs err
-	) end :
-	sqrt err
+	) end
+
+/* Compute the n-th Fibonacci number */
+new Int:n -> fib -> Int:x Int:y
+y x+y from
+	if n < 0
+		0 1 store y x
+	else
+		n-1 fib x y
 ```
 
 ## Basic Syntax
@@ -53,7 +61,16 @@ Clearly, literals are always providing data, as their value cannot be changed. W
 	a function1 b:v		// Provides the result of function1 and the value of b for the next function call
 ```
 
-For a simple variable assignment without calling into a function, use the keyword store. It is used in Code just like a function call, but is evaluated at compile time. In effect, *store* is a type-independent identity-function that returns its input unaltered. If store and *:v* are used in conjunction, then *:v* supersedes.
+For a simple variable assignment without calling into a function, use the keyword `store`. It is used in Code just like a function call, but is evaluated at compile time. In effect, `store` is a type-independent identity-function that returns its input unaltered. If store and `:v` are used in conjunction, then `:v` supersedes.
+
+*Note*: Because the data is arranged in a stack, saving data for multiple variables at once might not work as you might expect. Take the following example:
+```
+extern func1 -> Int:a Int:b Int:c
+func1 x1 x2 x3		// x1 now has the value of a, x2 that of b, x3 that of c
+
+1 2 3 store x1 x2 x3	// x1 now has the value of 3, x2 that of 2, x3 that of 1
+```
+This confusion can be avoided by assigning each variable independently.
 
 New variables are created by appending ":!" to the variable name. New variables are always absorbing data, and this behaviour cannot be altered. Notice that there is no need to specify a type for a new variable, since it is inferred automatically from the value stored into it. To explicitly mention a type, either for debugging or maintainability, you may use comments at any point in the code (except in the middle of an identifier or literal).
 
@@ -61,7 +78,7 @@ An important feature of Phi's ability to return multiple values is the fact that
 
 ### Functions
 
-A function is declared using the *new* keyword, followed by the function's prototype, followed by a sequence of commands (chained with ':'). A Prototype defines the input arguments to the function, the functions name and its return values (in this order).
+A function is declared using the *new* keyword, followed by the function's prototype. A Prototype defines the input arguments to the function, the functions name and its return values (in this order).
 
 The input arguments are simply a list of type-name pairs in the form *Type:Name*, where *Type* is one of Real, Int or Bool (More types are coming) and *Name* is any valid identifier. If another identifier with this name already exists, it will be shadowed for the duration of the function call, but it becomes available again once the function ends.
 
@@ -74,7 +91,8 @@ func1 -> Real:x			// valid
 Real:x -> func1			// invalid!
 ```
 
-The return value of the function is automatically created from the data available at the end of the last command. In general, this corresponds to listing out the values to return (in the appropriate order) in the last line of the function body, but in some cases this can also be the return value of another function as well.
+The return value of the function can be declared in two ways. The recommended way is to list out all return values at the top of the function body (after the prototype, but before any other commands), followed by the keyword "from" and the function body. This is similar to Haskell's `where` concept. In the function body, commands can be chained by placing a colo (`:`) between them. See the examples above for how that looks.
+If the return data is not provided at the start, it is automatically created from the data available at the end of the last command. In general, this will be the return value of another function, but it may also be a list of variables/literals - or a combination of all three!
 
 ### Control Flow
 
@@ -93,26 +111,32 @@ However, this does **not** mean, that the code does indeed run with vectors of t
 Solving this is a task on LLVM's coding team, not me. Still, there is an easy work around, which might boil down to a no-op, if you were aiming for the ultimate fastest code already anyway.
 
 Phi cannot currently produce executables directly. Instead, it produces an object file, which must then be linked used any common compiler like GCC or clang. Both of these provide optimizations already, one of which involves vectorization. Thus, to get the best vectorized experience possible, the workflow is as follows:
+
  * Use vector types in Phi
  * Produce a (potentially less vectorized) object file
  * Compile with GCC/Clang with optimizations on to produce a highly vectorized executable
+
 In fact, using Vector Types in Phi is not strictly necessary, but doing so helps the optimizer recognize, where vector instructions are used/useful.
 
 ## Interfacing with other languages
 
 Phi produces an object file. This object file can be linked against any other object file on the same target machine (i.e. the native host) by using any compiler/linker like Clang/GCC or the like. To declare a function that is defined elsewhere, use the `extern` keyword followed by the functions prototype. In this case, all parameter names can be omitted - and if any are provided, they are simply ignored. The type correspondences between Phi and C are given below.
+
  * Real -> double
  * Bool -> int
+
 To make use of the multiple return values of a Phi function within a different language (say a C program calls a Phi function), you may be able to define a struct that contains the same fields in the same order. However there is no guarantee this will work in all cases.
 
 ## The Binary Operators
 
 Phi defines the usual plethora of binary operators, however there are some important notes to be mentioned here. The list below shows the type constellation of the operation on the left and the corrensponding C-code on the right.
+
  * Bool:b1 \* Bool:b2 == b1 && b2
  * Bool:b1 \* (Any):x1 == b1 ? x1 : 0
  * (Any):x1 \* Bool:b2 == b2 ? x1 : 0
  * Bool:b1 \+ Bool:b2 == b1 ^ b2
  * Bool:b1 \< Bool:b2 == !b1 && b2
+
 If both operands are of vector type, then the operations are performed elementwise. No scalar-vector mutiplication is supported as of now. The only exception are scalar booleans, in which case the entire vector is either kept or null'ed - depending on the truth value.
 
 The Modulo operator works as usual, if both operands are non-zero integers. If either of the operands is a Real, then the floating point remainder is computed, i.e. the remainder after subtracting the largest integer multiple of the right hand operand (e.g. 3 % 0.7 = 0.2, because 2.8 < 3). Additionally, if the right hand operand is zero, the result is simply the left hand operand. Note that this is consistent with the properties of a Euclidean Ring!

@@ -11,7 +11,7 @@
 	void *pointer;
 	double numerical;
 }
-%token keyword_new keyword_extern
+%token keyword_new keyword_extern keyword_from
 %token keyword_if keyword_else keyword_while keyword_end
 %token type_real type_bool type_int
 %token tok_new tok_var tok_func tok_arrow
@@ -125,7 +125,10 @@ MALFORMED : EXPRESSION OP error		{ clearExpr($1); ERROR("Invalid right-hand Oper
 |* Anything related to Functions comes below here: *|
 \*=================================================*/
 
-DEFINITION : DECLARATION QUEUE		{ $$ = newFunctionExpr($1, $2); }
+DEFINITION : DECLARATION QUEUE		{ $$ = newFunctionExpr($1, $2, NULL); }
+	   | DECLARATION COMMAND keyword_from QUEUE { $$ = newFunctionExpr($1, $4, $2); }
+	   | DECLARATION COMMAND keyword_from error { ERROR("Expected Function Body after keyword \"from\".", 0x1901, @4); }
+	   | DECLARATION error		{ ERROR("Expected Function Body after new Declaration.", 0x1902, @2); }
 	   ;
 
 DECLARATION : DECBODY TYPESIG		{ stack *outArgs = $2;

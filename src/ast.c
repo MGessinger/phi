@@ -109,7 +109,7 @@ Expr* newProtoExpr (char *name, stack *in, stack *out)
 	return e;
 }
 
-Expr* newFunctionExpr (Expr *proto, Expr *body)
+Expr* newFunctionExpr (Expr *proto, Expr *body, Expr *ret)
 {
 	Expr *e = newExpression(expr_func);
 	if (e == NULL)
@@ -122,6 +122,7 @@ Expr* newFunctionExpr (Expr *proto, Expr *body)
 	}
 	fe->proto = proto;
 	fe->body = body;
+	fe->ret = ret;
 	e->expr = fe;
 	return e;
 }
@@ -203,6 +204,7 @@ void clearFunctionExpr (FunctionExpr *fe)
 		return;
 	clearExpr(fe->proto);
 	clearExpr(fe->body);
+	clearExpr(fe->ret);
 }
 
 void clearCondExpr (CondExpr *ce)

@@ -49,7 +49,7 @@ typedef struct LiteralExprAST {
 
 typedef struct BinaryExprAST {
 	int op;
-	void *LHS, *RHS;
+	Expr *LHS, *RHS;
 } BinaryExpr;
 
 typedef struct IdentExprAST {
@@ -73,6 +73,7 @@ typedef struct ProtoExprAST {
 typedef struct FuncExprAST {
 	Expr *proto;
 	Expr *body;
+	Expr *ret;
 } FunctionExpr;
 
 typedef struct CondExprAST {
@@ -92,7 +93,7 @@ Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name, IdFlag flag, unsigned size);
 Expr* newAccessExpr (Expr *ie, Expr *idx);
 Expr* newProtoExpr (char *name, stack *in, stack *out);
-Expr* newFunctionExpr (Expr *proto, Expr *body);
+Expr* newFunctionExpr (Expr *proto, Expr *body, Expr *ret);
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
 Expr* newLoopExpr (Expr *Cond, Expr *body, Expr *Else);
 
