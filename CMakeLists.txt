@@ -14,9 +14,9 @@ set (PhiSrc
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 
-BISON_TARGET(parser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.c
-		DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.h)
-FLEX_TARGET(lexer src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.c)
+BISON_TARGET(parser ${Phi_SOURCE_DIR}/src/parser.y ${Phi_BINARY_DIR}/parser.c
+		DEFINES_FILE ${Phi_BINARY_DIR}/parser.h)
+FLEX_TARGET(lexer ${Phi_SOURCE_DIR}/src/lexer.l ${Phi_BINARY_DIR}/lexer.c)
 ADD_FLEX_BISON_DEPENDENCY(lexer parser)
 
 # Add llvm to the project and configure the flags
@@ -27,9 +27,9 @@ include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 # Set the target and include my own directories
-include_directories(src ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${Phi_SOURCE_DIR}/src ${Phi_BINARY_DIR})
 
 add_executable(phi ${PhiSrc} ${BISON_parser_OUTPUTS} ${FLEX_lexer_OUTPUTS})
 
 target_link_libraries(phi LLVM)
-target_compile_options(phi PRIVATE -Wall -Wextra -Werror -pedantic -O2)
+target_compile_options(phi PRIVATE -Wall -Wextra -Werror -pedantic)

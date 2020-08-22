@@ -2,6 +2,6 @@
 #define LLVMCONTROL_H_
 
 void initialiseLLVM ();
-void shutdownLLVM (int emit);
+void shutdownLLVM ();
 
 #endif /* LLVMCONTROL_H_ */

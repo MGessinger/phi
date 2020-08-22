@@ -16,10 +16,10 @@ There are two options for building Phi. On the one hand, a Makefile is provided,
 ```
 mkdir build
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
-This will produce an executable called `phi` in the directory called `build`. For usage information, run `phi -h`.
+This will produce an executable called `phi` in the directory called `build`. For usage information, run `phi -h`. If you want a build with Debug information, replace the CMake build-type `Release` by `RelWithDebInfo`. The build type `Debug` is reserved for Development only.
 
 ## Sample Code
 
@@ -63,7 +63,7 @@ Clearly, literals are always providing data, as their value cannot be changed. W
 
 For a simple variable assignment without calling into a function, use the keyword `store`. It is used in Code just like a function call, but is evaluated at compile time. In effect, `store` is a type-independent identity-function that returns its input unaltered. If store and `:v` are used in conjunction, then `:v` supersedes.
 
-*Note*: Because the data is arranged in a stack, saving data for multiple variables at once might not work as you might expect. Take the following example:
+**Note**: Because the data is arranged in a stack, saving data for multiple variables at once might not work as you might expect. Take the following example:
 ```
 extern func1 -> Int:a Int:b Int:c
 func1 x1 x2 x3		// x1 now has the value of a, x2 that of b, x3 that of c
@@ -72,17 +72,19 @@ func1 x1 x2 x3		// x1 now has the value of a, x2 that of b, x3 that of c
 ```
 This confusion can be avoided by assigning each variable independently.
 
-New variables are created by appending ":!" to the variable name. New variables are always absorbing data, and this behaviour cannot be altered. Notice that there is no need to specify a type for a new variable, since it is inferred automatically from the value stored into it. To explicitly mention a type, either for debugging or maintainability, you may use comments at any point in the code (except in the middle of an identifier or literal).
+New variables are created by appending `:!` to the variable name. New variables are always absorbing data, and this behaviour cannot be altered. Notice that there is no need to specify a type for a new variable, since it is inferred automatically from the value stored into it. To explicitly mention a type, either for debugging or maintainability, you may use comments at any point in the code (except in the middle of an identifier or literal).
 
 An important feature of Phi's ability to return multiple values is the fact that data can be only partially absorbed. More specifically, If a function returns, say, three values, then the first one can be stored into a variable while the second and third are passed to another function. This allows for a very rich structure with simple syntax, but it also hides the danger of writing horribly unreadable code.
 
 ### Functions
 
-A function is declared using the *new* keyword, followed by the function's prototype. A Prototype defines the input arguments to the function, the functions name and its return values (in this order).
+A function is declared using the `new`-keyword, followed by the function's prototype. A Prototype defines the input arguments to the function, the functions name and its return values (in this order).
 
-The input arguments are simply a list of type-name pairs in the form *Type:Name*, where *Type* is one of Real, Int or Bool (More types are coming) and *Name* is any valid identifier. If another identifier with this name already exists, it will be shadowed for the duration of the function call, but it becomes available again once the function ends.
+The input arguments are simply a list of type-name pairs in the form `Type:Name`, where `Type` is one of Real, Int or Bool (More types are coming) and `Name` is any valid identifier. If another identifier with this name already exists, it will be shadowed for the duration of the function call, but it becomes available again once the function ends.
 
-The list of input arguments ends with an arrow (->), followed by an identifier used as the function name, another arrow and the output parameters. The latter are provided in the same way as the input arguments, with the exception that the name can be omitted, so a simple type name suffices. If an identifier is provided, then a local variable with that name will be created, however there is no association between the name and the output parameter - it is simply a syntactic simplification!
+An identifier can be any sequence of alphanumeric characters or underscores, but the first character must not be a number (i.e. `__test0` is valid, but `0test` is not). Which characters are considered alphanumeric, is determined by the Locale.
+
+The list of input arguments ends with an arrow (`->`), followed by an identifier used as the function name, another arrow and the output parameters. The latter are provided in the same way as the input arguments, with the exception that the name can be omitted, so a simple type name suffices. If an identifier is provided, then a local variable with that name will be created, however there is no association between the name and the output parameter - it is simply a syntactic simplification!
 
 The input list can be empty, in which case the first arrow i omitted as well, but it must return at least one value! Example:
 ```
@@ -91,7 +93,8 @@ func1 -> Real:x			// valid
 Real:x -> func1			// invalid!
 ```
 
-The return value of the function can be declared in two ways. The recommended way is to list out all return values at the top of the function body (after the prototype, but before any other commands), followed by the keyword "from" and the function body. This is similar to Haskell's `where` concept. In the function body, commands can be chained by placing a colo (`:`) between them. See the examples above for how that looks.
+The return value of the function can be declared in two ways. The recommended way is to list out all return values at the top of the function body (after the prototype, but before any other commands), followed by the `from`-keyword and the function body. This is similar to Haskell's `where` concept. In the function body, commands can be chained by placing a colon (`:`) between them. See the examples above for how that looks.
+
 If the return data is not provided at the start, it is automatically created from the data available at the end of the last command. In general, this will be the return value of another function, but it may also be a list of variables/literals - or a combination of all three!
 
 ### Control Flow
