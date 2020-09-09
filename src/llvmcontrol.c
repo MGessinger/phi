@@ -13,7 +13,6 @@ extern LLVMModuleRef phi_module;
 extern LLVMBuilderRef phi_builder, alloca_builder;
 
 LLVMPassManagerRef phi_passManager;
-static LLVMTargetMachineRef phi_targetMachine;
 
 LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
 {
@@ -27,7 +26,7 @@ LLVMPassManagerRef setupPassManager (LLVMModuleRef m)
 	return pmr;
 }
 
-LLVMBool setupTargetMachine ()
+LLVMBool emitObjectFile (const char *filename)
 {
 	LLVMInitializeAllTargetInfos();
 	LLVMInitializeAllTargets();
@@ -45,14 +44,23 @@ LLVMBool setupTargetMachine ()
 		return 0;
 	}
 
-	phi_targetMachine = LLVMCreateTargetMachine(Target, triple, "generic", "",
+	LLVMTargetMachineRef phi_targetMachine = LLVMCreateTargetMachine(Target, triple, "generic", "",
 			LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
 	LLVMTargetDataRef targetData = LLVMCreateTargetDataLayout(phi_targetMachine);
 	LLVMSetModuleDataLayout(phi_module, targetData);
 	LLVMSetTarget(phi_module, triple);
+
+	LLVMBool emitFailed = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, filename, LLVMObjectFile, &errorMsg);
+	if (emitFailed)
+	{
+		logError(errorMsg, 0x2F01);
+		LLVMDisposeMessage(errorMsg);
+	}
+
 	LLVMDisposeMessage(triple);
 	LLVMDisposeTargetData(targetData);
-	return 1;
+	LLVMDisposeTargetMachine(phi_targetMachine);
+	return !emitFailed;
 }
 
 void initialiseLLVM ()
@@ -66,7 +74,6 @@ void initialiseLLVM ()
 
 	phi_module = LLVMModuleCreateWithNameInContext("phi_compiler_module", phi_context);
 	phi_passManager = setupPassManager(phi_module);
-	setupTargetMachine();
 }
 
 void shutdownLLVM ()
@@ -77,13 +84,7 @@ void shutdownLLVM ()
 	if (verified == 0)
 	{
 #ifdef NDEBUG
-		char *errorMsg;
-		LLVMBool emitSuccess = LLVMTargetMachineEmitToFile(phi_targetMachine, phi_module, "output.o", LLVMObjectFile, &errorMsg);
-		if (emitSuccess != 0)
-		{
-			logError(errorMsg, 0x2F01);
-			LLVMDisposeMessage(errorMsg);
-		}
+		emitObjectCode("output.o");
 #else
 		LLVMDumpModule(phi_module);
 #endif
@@ -92,9 +93,7 @@ void shutdownLLVM ()
 	LLVMDisposeBuilder(phi_builder);
 	LLVMDisposeBuilder(alloca_builder);
 	LLVMFinalizeFunctionPassManager(phi_passManager);
-	LLVMDisposeTargetMachine(phi_targetMachine);
 	LLVMDisposePassManager(phi_passManager);
 	LLVMDisposeModule(phi_module);
 	LLVMShutdown();
 }
-
