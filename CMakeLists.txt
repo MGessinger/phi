@@ -6,6 +6,7 @@ set (PhiSrc
 	src/ast.c
 	src/codegen.c
 	src/binaryops.c
+	src/templating.c
 	src/llvmcontrol.c
 	src/main.c
 )

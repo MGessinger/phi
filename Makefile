@@ -1,7 +1,7 @@
 LLVMFLAGS = $(shell llvm-config --cflags --ldflags --system-libs --libs all)
 CFLAGS = -O3 -g -Wall -Wextra -Werror -pedantic -Isrc -I.
 
-OBJS = lexer.o parser.o ast.o binaryops.o codegen.o stack.o llvmcontrol.o main.o
+OBJS = lexer.o parser.o ast.o templating.o binaryops.o codegen.o stack.o llvmcontrol.o main.o
 NAME = phi
 
 VPATH = src

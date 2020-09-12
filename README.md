@@ -27,11 +27,11 @@ This will produce an executable called `phi` in the directory called `build`. Fo
 /* Compute the square root of a using the Babylonian Method and return square root and error */
 new Real:a -> babylon -> Real:sqrt Real:err
 sqrt err from
-	a abs a :
-	1 store sqrt :
-	sqrt-a abs err :
+	a abs a;
+	1 store sqrt;
+	sqrt-a abs err;
 	while err > 0.00001 (
-		(sqrt + a/sqrt)/2 store sqrt :
+		(sqrt + a/sqrt)/2 store sqrt;
 		sqrt-a/sqrt abs err
 	) end
 
@@ -46,21 +46,19 @@ y x+y from
 
 ## Basic Syntax
 
-A Phi-command consists of a sequence of Identifiers or Constant Literals. As mentioned above, Phi uses Reverse Polish Notation, which means that a function call is performed by listing out the arguments, followed by the function name. The output of a function call can then either be stored in a variable, or used as input to another function. Commands can be chained by placing a colon (:) between them.
+A Phi-command consists of a sequence of Identifiers or Constant Literals. As mentioned above, Phi uses Reverse Polish Notation, which means that a function call is performed by listing out the arguments, followed by the function name. The output of a function call can then either be stored in a variable, or used as input to another function. Commands can be chained by placing a semicolon (;) between them.
 
 ### Variables
 
-Variables in Phi are categorized into two distinct groups. The first group is said to *provide* data, and consists of those variables that are used as input for some function call or function return value. The second group is said to *absorb* data and consists of variables that are used to store the result of a function call or literal.
+Variables in a Phi command are categorized into two distinct groups. The first group is said to *provide* data, and consists of those variables that are used as input for some function call or function return value. The second group is said to *absorb* data and consists of variables that are used to store the result of a function call or literal. Of course, the role of a variable can change from one command to the next.
 
 This can be thought of as a stack based system: If there is data on the stack, a variable will pop that data and store it away, otherwise it pushes its data onto the stack. Note however that this stack analysis is evaluated ad Compile time and therefore there is no overhead compared to direct assignments like C.
 
 Clearly, literals are always providing data, as their value cannot be changed. Whether a variable is providing or absorbing data, depends on its position in the surrounding command. By default, any variable occurring before a function call is providing data, any variable occurring after a function call is absorbing data. You can override the latter by appending ":v" to the variable name to declare it as providing data. Example:
-
 ```
 	a function1 b		// stores the result of function1 into the variable b
 	a function1 b:v		// Provides the result of function1 and the value of b for the next function call
 ```
-
 For a simple variable assignment without calling into a function, use the keyword `store`. It is used in Code just like a function call, but is evaluated at compile time. In effect, `store` is a type-independent identity-function that returns its input unaltered. If store and `:v` are used in conjunction, then `:v` supersedes.
 
 **Note**: Because the data is arranged in a stack, saving data for multiple variables at once might not work as you might expect. Take the following example:
@@ -92,10 +90,48 @@ Real:x -> func1 -> Real		// valid
 func1 -> Real:x			// valid
 Real:x -> func1			// invalid!
 ```
-
 The return value of the function can be declared in two ways. The recommended way is to list out all return values at the top of the function body (after the prototype, but before any other commands), followed by the `from`-keyword and the function body. This is similar to Haskell's `where` concept. In the function body, commands can be chained by placing a colon (`:`) between them. See the examples above for how that looks.
 
 If the return data is not provided at the start, it is automatically created from the data available at the end of the last command. In general, this will be the return value of another function, but it may also be a list of variables/literals - or a combination of all three!
+
+### Templates
+
+A function can take one template parameter. To denote this, declare the type parameter in pointy brackets in the function's prototype.
+To call a template, the type parameter must be appended in pointy brackets to the template name.
+```
+extern <T> T:x -> duplicate -> T T
+
+new Int:n -> timesTwo -> Int
+a+b from
+	n duplicate:<Int> a:! b:!
+```
+Because templates are evaluated on compile time, there is no additional overhead compared to a direct function call.
+There is currently no way to restrict the template parameter.
+
+When a template is called, an appropriate version of that function is compiled for the given type parameter. In particular, until a call is made, no code is compiled for the template! To force code generation for a particular version of a template, without explicitly calling into it, use the keyword compile:
+```
+new <T> T:x -> duplicate -> T T
+	x x
+
+compile duplicate:<Int> duplicate:<Real>
+```
+This is usually only necessary when compilling a library, since an executable has all function calls available at compile time.
+
+You can also override a template with a specific version for a type, by defining the template as shown below:
+```
+new <T> T:x -> identity -> T
+	T
+
+new !<Int> Int -> identity -> Int
+	42
+```
+Lastly, to call a template function, which was compiled in Phi, from a different Language, append the Type name to the function name (without any parentheses). Explicitly, assume there is a Phi-file like this:
+```
+new <T> T:x -> timesThree -> T
+	x+x+x
+compile timesThree:<Int>
+```
+Then you can call a function with the name `timesThreeInt` from another language.
 
 ### Control Flow
 

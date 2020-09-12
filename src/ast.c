@@ -5,162 +5,121 @@
  * Create Data *
 \*-------------*/
 
-Expr* newExpression (ExprType expr_type)
+Expr* newExpression (void *expr, ExprType expr_type)
 {
 	Expr *e = malloc(sizeof(Expr));
 	if (e == NULL)
+	{
+		free(expr);
 		return logError("Could not allocate Memory", 0x100);
+	}
+	e->expr = expr;
 	e->expr_type = expr_type;
 	return e;
 }
 
 Expr* newLiteralExpr (double val, int type)
 {
-	Expr *e = newExpression(expr_literal);
-	if (e == NULL)
-		return NULL;
 	LiteralExpr *ne = malloc(sizeof(LiteralExpr));
 	if (ne == NULL)
-	{
-		free(e);
 		return logError("Could not allocate Memory.", 0x101);
-	}
 	if (type == lit_real)
 		ne->val.real = val;
 	else
 		ne->val.integral = val;
 	ne->type = type;
-	e->expr = ne;
-	return e;
+	return newExpression(ne, expr_literal);
 }
 
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS)
 {
-	Expr *e = newExpression(expr_binop);
-	if (e == NULL)
-		return NULL;
 	BinaryExpr *be = malloc(sizeof(BinaryExpr));
 	if (be == NULL)
-	{
-		free(e);
 		return logError("Could not allocate Memory.", 0x102);
-	}
 	be->op = binop;
 	be->LHS = LHS;
 	be->RHS = RHS;
-	e->expr = be;
-	return e;
+	return newExpression(be, expr_binop);
 }
 
 Expr* newIdentExpr (char *name, IdFlag flag, unsigned size)
 {
-	Expr *e = newExpression(expr_ident);
-	if (e == NULL)
-		return NULL;
 	IdentExpr *ie = malloc(sizeof(IdentExpr));
 	if (ie == NULL)
-	{
-		free(e);
 		return logError("Could not allocate Memory.", 0x103);
-	}
 	ie->name = name;
 	ie->flag = flag;
 	ie->size = size;
-	e->expr = ie;
-	return e;
+	return newExpression(ie, expr_ident);
 }
 
 Expr* newAccessExpr (Expr *ie, Expr *idx)
 {
-	Expr *e = newExpression(expr_access);
-	if (e == NULL)
-		return NULL;
 	AccessExpr *ae = malloc(sizeof(AccessExpr));
 	if (ae == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x103);
-	}
+		return logError("Could not allocate Memory.", 0x104);
 	IdentExpr *ide = ie->expr;
 	ae->name = ide->name;
 	ae->flag = ide->flag;
 	ae->idx = idx;
-	e->expr = ae;
 	free(ie->expr);
 	free(ie);
-	return e;
+	return newExpression(ae, expr_access);
 }
 
-Expr* newProtoExpr (char *name, stack *in, stack *out)
+Expr* newProtoExpr (char *name, stack *in, stack *out, int isTemplate)
 {
-	Expr *e = newExpression(expr_proto);
-	if (e == NULL)
-		return NULL;
 	ProtoExpr *pe = malloc(sizeof(ProtoExpr));
 	if (pe == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x104);
-	}
+		return logError("Could not allocate Memory.", 0x105);
 	pe->name = name;
 	pe->inArgs = in;
 	pe->outArgs = out;
-	e->expr = pe;
-	return e;
+	pe->isTemplate = isTemplate;
+	return newExpression(pe, expr_proto);
 }
 
 Expr* newFunctionExpr (Expr *proto, Expr *body, Expr *ret)
 {
-	Expr *e = newExpression(expr_func);
-	if (e == NULL)
-		return NULL;
 	FunctionExpr *fe = malloc(sizeof(FunctionExpr));
 	if (fe == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x105);
-	}
+		return logError("Could not allocate Memory.", 0x106);
 	fe->proto = proto;
 	fe->body = body;
 	fe->ret = ret;
-	e->expr = fe;
-	return e;
+	return newExpression(fe, expr_func);
+}
+
+Expr* newTemplateExpr (char *name, int type_name)
+{
+	TemplateExpr *te = malloc(sizeof(TemplateExpr));
+	if (te == NULL)
+		return logError("Could not allocate Memory.", 0x107);
+	te->name = name;
+	te->type_name = type_name;
+	return newExpression(te, expr_template);
 }
 
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False)
 {
-	Expr *e = newExpression(expr_conditional);
-	if (e == NULL)
-		return NULL;
 	CondExpr *ce = malloc(sizeof(CondExpr));
 	if (ce == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x107);
-	}
+		return logError("Could not allocate Memory.", 0x108);
 	ce->Cond = Cond;
 	ce->True = True;
 	ce->False = False;
-	e->expr = ce;
-	return e;
+	return newExpression(ce, expr_conditional);
 }
 
 Expr* newLoopExpr (Expr *Cond, Expr *Body, Expr *Else)
 {
-	Expr *e = newExpression(expr_loop);
-	if (e == NULL)
-		return NULL;
 	LoopExpr *le = malloc(sizeof(LoopExpr));
 	if (le == NULL)
-	{
-		free(e);
-		return logError("Could not allocate Memory.", 0x107);
-	}
+		return logError("Could not allocate Memory.", 0x109);
 	le->Cond = Cond;
 	le->Body = Body;
 	le->Else = Else;
-	e->expr = le;
-	return e;
+	return newExpression(le, expr_loop);
 }
 
 /*----------------------*\
@@ -189,6 +148,7 @@ void clearAccessExpr (AccessExpr *ae)
 	free(ae->name);
 	clearExpr(ae->idx);
 }
+
 void clearProtoExpr (ProtoExpr *pe)
 {
 	if (pe == NULL)
@@ -205,6 +165,13 @@ void clearFunctionExpr (FunctionExpr *fe)
 	clearExpr(fe->proto);
 	clearExpr(fe->body);
 	clearExpr(fe->ret);
+}
+
+void clearTemplateExpr (TemplateExpr *te)
+{
+	if (te == NULL)
+		return;
+	free(te->name);
 }
 
 void clearCondExpr (CondExpr *ce)
@@ -245,6 +212,9 @@ void clearExpr (Expr *e)
 			break;
 		case expr_func:
 			clearFunctionExpr(e->expr);
+			break;
+		case expr_template:
+			clearTemplateExpr(e->expr);
 			break;
 		case expr_conditional:
 			clearCondExpr(e->expr);

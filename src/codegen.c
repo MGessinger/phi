@@ -9,11 +9,11 @@
 #include "parser.h"
 #include "codegen.h"
 #include "binaryops.h"
+#include "templating.h"
 
 LLVMContextRef phi_context;
 LLVMModuleRef phi_module;
 LLVMBuilderRef phi_builder, alloca_builder;
-extern LLVMPassManagerRef phi_passManager;
 
 static stack *valueStack = NULL;
 static stack *namesInScope = NULL;
@@ -21,6 +21,7 @@ static int scope = 0;
 
 LLVMTypeRef getAppropriateType (int typename)
 {
+	extern LLVMTypeRef templateType;
 	LLVMTypeRef type = NULL;
 	switch (typename & 0xFFF)
 	{
@@ -32,6 +33,9 @@ LLVMTypeRef getAppropriateType (int typename)
 			break;
 		case type_int:
 			type = LLVMInt32TypeInContext(phi_context);
+			break;
+		case type_template:
+			type = templateType;
 			break;
 		default:
 			return logError("Unknown Type Name!", 0x2101);
@@ -86,16 +90,12 @@ LLVMValueRef codegenLiteralExpr (LiteralExpr *le)
 	return val;
 }
 
-LLVMValueRef codegenCallExpr (IdentExpr *ie)
+LLVMValueRef codegenCallExpr (LLVMValueRef function)
 {
-	LLVMValueRef func = LLVMGetNamedFunction(phi_module, ie->name);
-	if (func == NULL)
-		return NULL;
-	unsigned expectedArgs = LLVMCountParams(func);
+	unsigned expectedArgs = LLVMCountParams(function);
 	if (expectedArgs > depth(valueStack))
 		return logError("Insufficient number of arguments given to function!", 0x2404);
-
-	/* Iteratively create the code for each argument */
+	/* Gather all arguments from the value stack */
 	LLVMValueRef argValues[expectedArgs];
 	for (int i = expectedArgs-1; i >= 0; i--)
 	{
@@ -105,7 +105,7 @@ LLVMValueRef codegenCallExpr (IdentExpr *ie)
 		argValues[i] = val;
 	}
 
-	LLVMValueRef result = LLVMBuildCall(phi_builder, func, argValues, expectedArgs, "calltmp");
+	LLVMValueRef result = LLVMBuildCall(phi_builder, function, argValues, expectedArgs, "calltmp");
 	LLVMTypeRef returnType = LLVMTypeOf(result);
 	LLVMTypeKind returnKind = LLVMGetTypeKind(returnType);
 	/* If we only returned a single type, push and return that. */
@@ -137,15 +137,6 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 			runner = runner->next;
 		}
 		return valueStack->item;
-	}
-	else if (strncmp(ie->name, "dup", 4) == 0)
-	{
-		if (valueStack == NULL)
-			return logError("No value found to be duplicated.", 0x2402);
-		int misc = valueStack->misc;
-		void *item = valueStack->item;
-		valueStack = push(item, misc, valueStack);
-		return item;
 	}
 	/* Now see if the identifier should be a new Variable. If so, create it and push it on the stack. */
 	if (ie->flag == id_new)
@@ -209,9 +200,9 @@ LLVMValueRef codegenIdentExpr (IdentExpr *ie)
 		if (ie->flag == id_var)
 			return logError("Found explicit Variable request with unknown identifier name!", 0x2406);
 	}
-	LLVMValueRef tryFunction = codegenCallExpr(ie);
-	if (tryFunction != NULL)
-		return tryFunction;
+	LLVMValueRef function = LLVMGetNamedFunction(phi_module, ie->name);
+	if (function != NULL)
+		return codegenCallExpr(function);
 	return logError("Unrecognized identifier!", 0x2407);
 }
 
@@ -219,8 +210,6 @@ LLVMValueRef codegenAccessExpr (AccessExpr *ae)
 {
 	if (strncmp(ae->name, "store", 6) == 0)
 		return logError("Attempting to access a keyword as a vector.", 0x2501);
-	if (strncmp(ae->name, "dup", 4) == 0)
-		return logError("Attempting to access a keyword as a vector.", 0x2502);
 
 	stack *globalValueStack = valueStack;
 	valueStack = NULL;
@@ -305,7 +294,7 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 	LLVMValueRef val = NULL;
 	switch (be->op)
 	{
-		case ':':
+		case ';':
 			clearStack(&globalValueStack, NULL);
 			return r;
 		case ' ':
@@ -341,6 +330,11 @@ LLVMValueRef codegenBinaryExpr (BinaryExpr *be)
 
 LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 {
+	if (pe->isTemplate)
+	{
+		declareNewTemplate(pe);
+		return NULL;
+	}
 	int numOfInputArgs = depth(pe->inArgs);
 	int numOfOutputArgs = depth(pe->outArgs);
 	LLVMTypeRef args[numOfInputArgs];
@@ -374,6 +368,12 @@ LLVMValueRef codegenProtoExpr (ProtoExpr *pe)
 LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 {
 	ProtoExpr *pe = fe->proto->expr;
+	/* Test if function is Template */
+	if (pe->isTemplate)
+	{
+		defineNewTemplate(fe);
+		return NULL;
+	}
 	/* Test if a function has been declared before */
 	LLVMValueRef function = LLVMGetNamedFunction(phi_module, pe->name);
 	if (function == NULL)
@@ -395,29 +395,31 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 	/* Give names to the function arguments. That way we can refer back to them in the function body. */
 	LLVMValueRef args[paramCount];
 	LLVMGetParams(function, args);
+	stack *argStack = pe->inArgs;
 	for (int i = paramCount-1; i >= 0; i--)
 	{
-		LLVMTypeRef argType = getAppropriateType((pe->inArgs)->misc);
-		char *name = pop(&(pe->inArgs));
+		LLVMTypeRef argType = getAppropriateType(argStack->misc);
+		char *name = argStack->item;
 		LLVMValueRef v = args[i];
 		LLVMSetValueName2(v, name, strlen(name));
 		LLVMValueRef alloca = CreateEntryPointAlloca(function, argType, name);
 		LLVMBuildStore(phi_builder, v, alloca);
 		namesInScope = push(alloca, scope, namesInScope);
-		free(name);
+		argStack = argStack->next;
 	}
 
 	/* Optionally, create variables for all named output parameters */
+	argStack = pe->outArgs;
 	do {
-		LLVMTypeRef argType = getAppropriateType((pe->outArgs)->misc);
-		char *name = pop(&(pe->outArgs));
+		LLVMTypeRef argType = getAppropriateType(argStack->misc);
+		char *name = argStack->item;
 		if (name != NULL)
 		{
 			LLVMValueRef alloca = CreateEntryPointAlloca(function, argType, name);
 			namesInScope = push(alloca, scope, namesInScope);
-			free(name);
 		}
-	} while (pe->outArgs != NULL);
+		argStack = argStack->next;
+	} while (argStack != NULL);
 
 	LLVMValueRef body = codegen(fe->body, 0);
 	if (body == NULL)
@@ -470,8 +472,22 @@ LLVMValueRef codegenFuncExpr (FunctionExpr *fe)
 		LLVMDeleteFunction(function);
 		return NULL;
 	}
+	extern LLVMPassManagerRef phi_passManager;
 	LLVMRunFunctionPassManager(phi_passManager, function);
 	return function;
+}
+
+LLVMValueRef codegenTemplateExpr (TemplateExpr *te)
+{
+	LLVMBasicBlockRef currentInsertBlock = LLVMGetInsertBlock(phi_builder);
+	stack *localValues = valueStack;
+	valueStack = NULL;
+	LLVMValueRef templateFunction = tryGetTemplate(te->name, te->type_name);
+	valueStack = localValues;
+	LLVMPositionBuilderAtEnd(phi_builder, currentInsertBlock);
+	if (templateFunction == NULL)
+		return logError("Unknown template name.", 0x2801);
+	return codegenCallExpr(templateFunction);
 }
 
 LLVMValueRef codegenCondExpr (CondExpr *ce)
@@ -621,6 +637,9 @@ LLVMValueRef codegen (Expr *e, int newScope)
 			break;
 		case expr_func:
 			val = codegenFuncExpr(e->expr);
+			break;
+		case expr_template:
+			val = codegenTemplateExpr(e->expr);
 			break;
 		case expr_conditional:
 			val = codegenCondExpr(e->expr);

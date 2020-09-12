@@ -4,6 +4,7 @@
 #include <string.h>
 #include "parser.h"
 static int curcol = 0;
+const char *templateVar;
 #define YY_USER_ACTION { curcol += yyleng; \
 			 yylloc.first_line = yylineno; \
 			 yylloc.first_column = curcol; }
@@ -31,6 +32,7 @@ INT	({HEXI}|{DECI})
 
 new			return keyword_new;
 extern			return keyword_extern;
+compile			return keyword_compile;
 from			return keyword_from;
 if			return keyword_if;
 else			return keyword_else;
@@ -46,7 +48,9 @@ Int			return type_int;
 True			{ yylval.integral = 1; return tok_bool; }
 False			{ yylval.integral = 0; return tok_bool; }
 
-{IDENT}			{ yylval.pointer = strndup(yytext, yyleng); BEGIN(IDENT); return tok_ident; }
+{IDENT}			{ if (templateVar != NULL && strncmp(yytext, templateVar, yyleng) == 0)
+				return type_template;
+			  yylval.pointer = strndup(yytext, yyleng); BEGIN(IDENT); return tok_ident; }
 <IDENT>":<"{INT}">"	{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_vec; }
 <IDENT>":["{INT}"]"	{ yylval.integral = strtol(yytext+2, NULL, 0); return tok_array; }
 

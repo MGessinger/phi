@@ -7,6 +7,7 @@
 
 #include "llvmcontrol.h"
 #include "ast.h"
+#include "templating.h"
 
 extern LLVMContextRef phi_context;
 extern LLVMModuleRef phi_module;
@@ -78,6 +79,7 @@ void initialiseLLVM ()
 
 void shutdownLLVM ()
 {
+	clearTemplates();
 	char *msg;
 	int verified = LLVMVerifyModule(phi_module, LLVMPrintMessageAction, &msg);
 	LLVMDisposeMessage(msg);

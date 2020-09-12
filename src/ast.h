@@ -21,6 +21,7 @@ typedef enum Expressions
 	expr_access,
 	expr_proto,
 	expr_func,
+	expr_template,
 	expr_conditional,
 	expr_loop
 } ExprType;
@@ -68,6 +69,7 @@ typedef struct ProtoExprAST {
 	stack *inArgs;
 	stack *outArgs;
 	char *name;
+	int isTemplate;
 } ProtoExpr;
 
 typedef struct FuncExprAST {
@@ -75,6 +77,11 @@ typedef struct FuncExprAST {
 	Expr *body;
 	Expr *ret;
 } FunctionExpr;
+
+typedef struct TempExprAST {
+	char *name;
+	int type_name;
+} TemplateExpr;
 
 typedef struct CondExprAST {
 	Expr *Cond;
@@ -92,12 +99,15 @@ Expr* newLiteralExpr (double val, int type);
 Expr* newBinaryExpr (int binop, Expr *LHS, Expr *RHS);
 Expr* newIdentExpr (char *name, IdFlag flag, unsigned size);
 Expr* newAccessExpr (Expr *ie, Expr *idx);
-Expr* newProtoExpr (char *name, stack *in, stack *out);
+Expr* newProtoExpr (char *name, stack *in, stack *out, int isTemplate);
 Expr* newFunctionExpr (Expr *proto, Expr *body, Expr *ret);
+Expr* newTemplateExpr (char *name, int type_name);
 Expr* newCondExpr (Expr *Cond, Expr *True, Expr *False);
 Expr* newLoopExpr (Expr *Cond, Expr *body, Expr *Else);
 
 void* logError (const char *msg, int code);
 void clearExpr (Expr *e);
+void clearFunctionExpr (FunctionExpr *fe);
+void clearProtoExpr (ProtoExpr *fe);
 
 #endif /* AST_H_ */
